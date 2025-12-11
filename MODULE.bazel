@@ -1,0 +1,23 @@
+module(
+    name = "interview_ai",
+    version = "0.0.1",
+)
+
+# Node.js toolchain
+bazel_dep(name = "rules_nodejs", version = "6.6.2")
+node = use_extension("@rules_nodejs//nodejs:extensions.bzl", "node", dev_dependency = True)
+node.toolchain(
+    node_version = "20.0.0",
+)
+use_repo(node, "nodejs")
+
+# JS rules (js_binary, etc.)
+bazel_dep(name = "aspect_rules_js", version = "2.8.3")
+
+# Use pnpm lockfile to manage npm dependencies (recommended)
+npm = use_extension("@aspect_rules_js//npm:extensions.bzl", "npm")
+npm.npm_translate_lock(
+    name = "npm",
+    pnpm_lock = "//:pnpm-lock.yaml",  # Can convert from package-lock.json using `pnpm import`
+)
+use_repo(npm, "npm")
