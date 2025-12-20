@@ -1,45 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
+import * as fs from 'fs';
+import * as path from 'path';
 
-const BQ_INTERVIEW_PROMPT = `You are a professional interview coach conducting a behavioral interview. Your role is to:
-
-1. Ask behavioral questions based on the STAR method (Situation, Task, Action, Result)
-2. Listen actively to the candidate's responses
-3. Ask follow-up questions to dig deeper into their experiences
-4. Provide brief, encouraging feedback when appropriate
-5. Keep the conversation natural and conversational, like a real interview
-
-## Interview Guidelines:
-
-- Start with a warm, personalized greeting that welcomes the candidate to Interview AI
-- Mention that today you'll be conducting a behavioral interview
-- Make the welcome message natural and varied - don't use the exact same words every time
-- Ask one question at a time
-- Wait for the candidate's complete response before asking the next question
-- Use follow-up questions to explore deeper:
-  - "Can you tell me more about that?"
-  - "What was your specific role in that situation?"
-  - "How did you measure success?"
-  - "What would you do differently if faced with the same situation?"
-- Keep responses concise (1-2 sentences for questions, brief follow-ups)
-- Maintain a professional but friendly tone
-- Remember the full conversation context - reference previous answers when appropriate
-- After 3-4 questions, provide a brief summary and ask if they have questions
-
-## Common BQ Topics:
-
-- Leadership and teamwork
-- Problem-solving and decision-making
-- Handling conflict or difficult situations
-- Time management and prioritization
-- Learning from failure
-- Adaptability and change management
-
-## Important Notes:
-
-- Always maintain conversation context - remember what the candidate has said previously
-- Build on previous answers naturally
-- If the candidate interrupts you, acknowledge it briefly and continue with the conversation
-- Keep track of the interview flow and topics already covered`;
+// Helper function to load prompt from file (supports both .md and .txt)
+function loadPrompt(promptName: string): string {
+  try {
+    // Try .txt first (for simple prompts like opening_greeting)
+    let promptPath = path.join(process.cwd(), 'prompts', `${promptName}.txt`);
+    if (fs.existsSync(promptPath)) {
+      return fs.readFileSync(promptPath, 'utf-8');
+    }
+    // Fallback to .md
+    promptPath = path.join(process.cwd(), 'prompts', `${promptName}.md`);
+    if (fs.existsSync(promptPath)) {
+      return fs.readFileSync(promptPath, 'utf-8');
+    }
+    return '';
+  } catch (error) {
+    console.error(`Error loading prompt ${promptName}:`, error);
+    // Fallback to default prompt
+    return '';
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -61,10 +43,44 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Load the appropriate prompt based on interview type
+    // Map interview type to human-readable description
+    const interviewTypeMap: Record<string, string> = {
+      'bq': 'behavioral question',
+      'behavioral': 'behavioral question',
+      'behavioral_question': 'behavioral question',
+      'technical': 'technical',
+      'system_design': 'system design',
+      'cultural_fit': 'cultural fit',
+    };
+    
+    const interviewTypeDescription = interviewTypeMap[interviewType.toLowerCase()] || interviewType;
+
+    // Load the appropriate prompt based on interview type and whether it's the first message
     let systemPrompt = '';
-    if (interviewType === 'bq') {
-      systemPrompt = BQ_INTERVIEW_PROMPT;
+    if (isFirstMessage) {
+      // Use opening greeting prompt for first message
+      systemPrompt = loadPrompt('opening_greeting');
+      // Replace {INTERVIEW_TYPE} placeholder with actual interview type
+      systemPrompt = systemPrompt.replace(/{INTERVIEW_TYPE}/g, interviewTypeDescription);
+      // Fallback to bq_interview_opening if opening_greeting not found
+      if (!systemPrompt) {
+        systemPrompt = loadPrompt('bq_interview_opening');
+        systemPrompt = systemPrompt.replace(/{INTERVIEW_TYPE}/g, interviewTypeDescription);
+      }
+    } else {
+      // Use regular interview prompt for subsequent messages
+      // Load based on interview type
+      if (interviewType === 'bq' || interviewType === 'behavioral' || interviewType === 'behavioral_question') {
+        systemPrompt = loadPrompt('bq_interview');
+      } else {
+        // For other interview types, try to load specific prompt or use default
+        systemPrompt = loadPrompt(`${interviewType}_interview`) || loadPrompt('bq_interview');
+      }
+    }
+    
+    // Fallback if prompt loading failed
+    if (!systemPrompt) {
+      systemPrompt = `You are a professional interview coach conducting a behavioral interview. Ask behavioral questions based on the STAR method and listen actively to responses.`;
     }
 
     // Always include system prompt to maintain context

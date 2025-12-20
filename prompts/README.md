@@ -5,6 +5,9 @@ This folder contains prompts for different types of interviews.
 ## Available Prompts
 
 - `bq_interview.md` - Behavioral Question (BQ) interview prompt
+- `bq_interview_opening.md` - Opening prompt for BQ interview (introduction and initial question)
+- `opening_greeting.txt` - Simple greeting prompt for interview start (introduce yourself and ask if they have questions)
+- `bq_interview_realtime.md` - BQ interview prompt optimized for Realtime API
 
 ## Usage
 
