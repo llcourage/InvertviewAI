@@ -1,0 +1,78 @@
+syntax = "proto3";
+
+package interview;
+
+// Interview message types
+message InterviewMessage {
+  string role = 1;           // "user" or "assistant" or "system"
+  string content = 2;        // Message content
+  int64 timestamp = 3;      // Unix timestamp
+}
+
+// Interview request
+message InterviewRequest {
+  repeated InterviewMessage messages = 1;
+  string interview_type = 2;  // "bq", "technical", etc.
+  bool is_first_message = 3;
+}
+
+// Interview response
+message InterviewResponse {
+  InterviewMessage message = 1;
+  string model = 2;
+  int32 usage_tokens = 3;
+}
+
+// Speech-to-text request
+message SpeechToTextRequest {
+  bytes audio_data = 1;      // Base64 encoded audio
+  string model = 2;          // "whisper-1"
+  string language = 3;       // Optional language code
+}
+
+// Speech-to-text response
+message SpeechToTextResponse {
+  string text = 1;
+  string language = 2;
+}
+
+// Text-to-speech request
+message TextToSpeechRequest {
+  string text = 1;
+  string model = 2;         // "tts-1" or "tts-1-hd"
+  string voice = 3;         // "alloy", "echo", "fable", etc.
+  double speed = 4;         // 0.25 to 4.0
+}
+
+// Text-to-speech response
+message TextToSpeechResponse {
+  bytes audio_data = 1;     // Base64 encoded audio
+  string format = 2;        // "mp3"
+}
+
+// Interview type
+enum InterviewType {
+  BEHAVIORAL_QUESTION = 0;
+  TECHNICAL = 1;
+  SYSTEM_DESIGN = 2;
+  CULTURAL_FIT = 3;
+}
+
+// Call status
+enum CallStatus {
+  DISCONNECTED = 0;
+  CONNECTING = 1;
+  CONNECTED = 2;
+  LISTENING = 3;
+  SPEAKING = 4;
+  PROCESSING = 5;
+}
+
+// Call state message
+message CallState {
+  CallStatus status = 1;
+  string status_text = 2;
+  bool is_muted = 3;
+  InterviewType interview_type = 4;
+}
+

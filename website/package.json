@@ -9,9 +9,11 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "form-data": "^4.0.0",
     "next": "^14.0.0",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "react-dom": "^18.2.0",
+    "undici": "^7.16.0"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",
@@ -20,5 +22,3 @@
     "typescript": "^5.3.0"
   }
 }
-
-

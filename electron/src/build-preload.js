@@ -11,3 +11,5 @@ const preloadJs = path.join(__dirname, 'preload.js');
 console.log('Note: Preload script should be compiled by TypeScript');
 
 
+
+

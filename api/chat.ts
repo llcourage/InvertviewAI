@@ -13,7 +13,7 @@ export default async function handler(
     return res.status(500).json({ error: 'OpenAI API key not configured' });
   }
 
-  const { messages, model = 'gpt-4', stream = false } = req.body;
+  const { messages, model = 'gpt-4o-mini', stream = false } = req.body;
 
   if (!messages || !Array.isArray(messages)) {
     return res.status(400).json({ error: 'Messages array is required' });
@@ -68,5 +68,6 @@ export default async function handler(
     res.status(500).json({ error: 'Internal server error' });
   }
 }
+
 
 

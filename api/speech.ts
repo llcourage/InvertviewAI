@@ -25,46 +25,20 @@ export default async function handler(
     // Convert base64 audio to buffer
     const audioBuffer = Buffer.from(audio, 'base64');
 
-    // Create multipart form data manually for Vercel/Node.js compatibility
-    const boundary = `----WebKitFormBoundary${Date.now()}`;
-    const formParts: string[] = [];
-
-    formParts.push(`--${boundary}`);
-    formParts.push(`Content-Disposition: form-data; name="file"; filename="audio.webm"`);
-    formParts.push(`Content-Type: audio/webm`);
-    formParts.push('');
-    formParts.push(audioBuffer.toString('binary'));
-
-    formParts.push(`--${boundary}`);
-    formParts.push(`Content-Disposition: form-data; name="model"`);
-    formParts.push('');
-    formParts.push(model);
-
-    if (language) {
-      formParts.push(`--${boundary}`);
-      formParts.push(`Content-Disposition: form-data; name="language"`);
-      formParts.push('');
-      formParts.push(language);
-    }
-
-    if (prompt) {
-      formParts.push(`--${boundary}`);
-      formParts.push(`Content-Disposition: form-data; name="prompt"`);
-      formParts.push('');
-      formParts.push(prompt);
-    }
-
-    formParts.push(`--${boundary}--`);
-
-    const formDataBody = Buffer.from(formParts.join('\r\n'), 'binary');
+    // Create FormData using native FormData (Node.js 18+)
+    const formData = new FormData();
+    const blob = new Blob([audioBuffer], { type: 'audio/webm' });
+    formData.append('file', blob, 'audio.webm');
+    formData.append('model', model);
+    if (language) formData.append('language', language);
+    if (prompt) formData.append('prompt', prompt);
 
     const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': `multipart/form-data; boundary=${boundary}`,
       },
-      body: formDataBody,
+      body: formData,
     });
 
     if (!response.ok) {

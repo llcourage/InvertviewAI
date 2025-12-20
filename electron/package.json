@@ -7,7 +7,8 @@
     "build": "tsc && npm run copy-renderer",
     "copy-renderer": "node -e \"const fs=require('fs');const path=require('path');if(!fs.existsSync('dist'))fs.mkdirSync('dist');fs.cpSync('renderer',path.join('dist','renderer'),{recursive:true,force:true})\"",
     "start": "electron dist/main.js",
-    "dev": "tsc && npm run copy-renderer && electron dist/main.js"
+    "dev": "tsc && npm run copy-renderer && electron dist/main.js",
+    "dev:local": "tsc && npm run copy-renderer && cross-env API_URL=http://localhost:3000 electron dist/main.js"
   },
   "dependencies": {
     "electron": "^28.0.0"

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Interview AI - Main Window</title>
+  <title>Interview AI - Voice Call</title>
   <style>
     * {
       margin: 0;
@@ -13,260 +13,1312 @@
 
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
       height: 100vh;
       display: flex;
       flex-direction: column;
-    }
-
-    .header {
-      background: rgba(255, 255, 255, 0.1);
-      padding: 1rem;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      backdrop-filter: blur(10px);
-    }
-
-    .title {
       color: white;
-      font-size: 1.5rem;
-      font-weight: 600;
-    }
-
-    .controls {
-      display: flex;
-      gap: 0.5rem;
-    }
-
-    button {
-      padding: 0.5rem 1rem;
-      background: rgba(255, 255, 255, 0.2);
-      color: white;
-      border: 1px solid rgba(255, 255, 255, 0.3);
-      border-radius: 6px;
-      cursor: pointer;
-      transition: background 0.2s;
-    }
-
-    button:hover {
-      background: rgba(255, 255, 255, 0.3);
-    }
-
-    .container {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      padding: 2rem;
-      max-width: 1000px;
-      width: 100%;
-      margin: 0 auto;
-    }
-
-    .chat {
-      flex: 1;
-      background: white;
-      border-radius: 12px;
-      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-      display: flex;
-      flex-direction: column;
       overflow: hidden;
     }
 
-    .messages {
+    .call-container {
       flex: 1;
-      overflow-y: auto;
-      padding: 1.5rem;
       display: flex;
       flex-direction: column;
-      gap: 1rem;
-    }
-
-    .empty {
-      text-align: center;
-      color: #999;
+      align-items: center;
+      justify-content: center;
       padding: 2rem;
+      position: relative;
     }
 
-    .message {
+    .call-status {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+
+    .status-text {
+      font-size: 1.2rem;
+      opacity: 0.9;
+      margin-bottom: 0.5rem;
+    }
+
+    .status-indicator {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #4caf50;
+      margin-right: 0.5rem;
+      animation: pulse 2s infinite;
+    }
+
+    .status-indicator.disconnected {
+      background: #f44336;
+      animation: none;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    .avatar-container {
+      width: 200px;
+      height: 200px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.1);
       display: flex;
-      flex-direction: column;
-      max-width: 80%;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 2rem;
+      border: 4px solid rgba(255, 255, 255, 0.2);
+      position: relative;
     }
 
-    .message.user {
-      align-self: flex-end;
+    .audio-visualizer {
+      position: absolute;
+      bottom: 1rem;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 90%;
+      max-width: 500px;
+      height: 80px;
+      display: none;
+      z-index: 10;
     }
 
-    .message.assistant {
-      align-self: flex-start;
+    .audio-visualizer.active {
+      display: block;
     }
 
-    .messageContent {
-      padding: 0.75rem 1rem;
-      border-radius: 12px;
-      word-wrap: break-word;
+    .visualizer-canvas {
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
     }
 
-    .message.user .messageContent {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    .avatar {
+      font-size: 80px;
+    }
+
+    .avatar-container.speaking {
+      border-color: #4caf50;
+      box-shadow: 0 0 30px rgba(76, 175, 80, 0.5);
+      animation: speaking 1s infinite;
+    }
+
+    .avatar-container.listening {
+      border-color: #2196f3;
+      box-shadow: 0 0 30px rgba(33, 150, 243, 0.5);
+      animation: listening 1s infinite;
+    }
+
+    @keyframes speaking {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+    }
+
+    @keyframes listening {
+      0%, 100% { transform: scale(1); box-shadow: 0 0 30px rgba(33, 150, 243, 0.5); }
+      50% { transform: scale(1.1); box-shadow: 0 0 50px rgba(33, 150, 243, 0.8); }
+    }
+
+    .interviewer-name {
+      font-size: 1.5rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+    }
+
+    .interview-type {
+      font-size: 0.9rem;
+      opacity: 0.7;
+    }
+
+    .controls {
+      position: absolute;
+      bottom: 3rem;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 1rem;
+      align-items: center;
+    }
+
+    .call-button {
+      width: 70px;
+      height: 70px;
+      border-radius: 50%;
+      border: none;
+      font-size: 1.5rem;
+      cursor: pointer;
+      transition: all 0.3s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+    }
+
+    .call-button.start {
+      background: #4caf50;
       color: white;
     }
 
-    .message.assistant .messageContent {
-      background: #f0f0f0;
-      color: #333;
+    .call-button.start:hover {
+      background: #45a049;
+      transform: scale(1.1);
     }
 
-    .inputArea {
+    .call-button.end {
+      background: #f44336;
+      color: white;
+    }
+
+    .call-button.end:hover {
+      background: #da190b;
+      transform: scale(1.1);
+    }
+
+    .call-button.mute {
+      width: 50px;
+      height: 50px;
+      background: rgba(255, 255, 255, 0.2);
+      color: white;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+    }
+
+    .call-button.mute:hover {
+      background: rgba(255, 255, 255, 0.3);
+    }
+
+    .call-button.mute.active {
+      background: #ff9800;
+      border-color: #ff9800;
+    }
+
+    .transcript {
+      position: absolute;
+      bottom: 10rem;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 80%;
+      max-width: 600px;
+      max-height: 200px;
+      overflow-y: auto;
+      background: rgba(0, 0, 0, 0.3);
+      padding: 1rem;
+      border-radius: 12px;
+      backdrop-filter: blur(10px);
+      display: none;
+    }
+
+    .transcript.active {
+      display: block;
+    }
+
+    .transcript-item {
+      margin-bottom: 0.5rem;
+      padding: 0.5rem;
+      border-radius: 6px;
+    }
+
+    .transcript-item.user {
+      background: rgba(76, 175, 80, 0.2);
+      text-align: right;
+    }
+
+    .transcript-item.interviewer {
+      background: rgba(33, 150, 243, 0.2);
+    }
+
+    .transcript-label {
+      font-size: 0.8rem;
+      opacity: 0.7;
+      margin-bottom: 0.25rem;
+    }
+
+    .header {
+      position: absolute;
+      top: 1rem;
+      right: 1rem;
       display: flex;
       gap: 0.5rem;
-      padding: 1rem;
-      border-top: 1px solid #e0e0e0;
+      align-items: center;
     }
 
-    .input {
-      flex: 1;
-      padding: 0.75rem;
-      border: 1px solid #ddd;
-      border-radius: 8px;
-      font-size: 1rem;
-      outline: none;
-    }
-
-    .input:focus {
-      border-color: #667eea;
-    }
-
-    .sendButton {
-      padding: 0.75rem 1.5rem;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    .header-button {
+      padding: 0.5rem 1rem;
+      background: rgba(255, 255, 255, 0.1);
       color: white;
-      border: none;
-      border-radius: 8px;
-      font-size: 1rem;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 6px;
       cursor: pointer;
+      font-size: 0.9rem;
     }
 
-    .sendButton:hover:not(:disabled) {
+    .header-button:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    .device-selector {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      padding: 0.5rem 1rem;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 6px;
+      min-width: 200px;
+    }
+
+    .device-selector label {
+      font-size: 0.85rem;
       opacity: 0.9;
     }
 
-    .sendButton:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
+    .device-selector select {
+      padding: 0.4rem;
+      background: rgba(0, 0, 0, 0.3);
+      color: white;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 4px;
+      font-size: 0.9rem;
+      cursor: pointer;
     }
 
-    .usage {
-      margin-top: 1rem;
-      padding: 1rem;
-      background: rgba(255, 255, 255, 0.1);
-      border-radius: 8px;
+    .device-selector select:hover {
+      background: rgba(0, 0, 0, 0.4);
+    }
+
+    .device-selector select option {
+      background: #2a5298;
       color: white;
-      backdrop-filter: blur(10px);
     }
   </style>
 </head>
 <body>
   <div class="header">
-    <div class="title">Interview AI</div>
-    <div class="controls">
-      <button id="floatingBtn">Toggle Floating Window</button>
+    <div class="device-selector">
+      <label for="micSelect">Microphone:</label>
+      <select id="micSelect">
+        <option value="">Loading devices...</option>
+      </select>
     </div>
+    <button class="header-button" id="toggleTranscript">Show Transcript</button>
+    <button class="header-button" id="floatingBtn">Floating Window</button>
   </div>
 
-  <div class="container">
-    <div class="chat">
-      <div class="messages" id="messages">
-        <div class="empty">Start a conversation...</div>
-      </div>
-      <div class="inputArea">
-        <input type="text" id="input" class="input" placeholder="Type your message...">
-        <button id="sendBtn" class="sendButton">Send</button>
+  <div class="call-container">
+    <div class="call-status">
+      <div class="status-text">
+        <span class="status-indicator" id="statusIndicator"></span>
+        <span id="statusText">Ready to start interview</span>
       </div>
     </div>
-    <div class="usage" id="usage">Loading usage...</div>
+
+    <div class="avatar-container" id="avatarContainer">
+      <div class="avatar">👤</div>
+    </div>
+
+    <div class="audio-visualizer" id="audioVisualizer">
+      <canvas class="visualizer-canvas" id="visualizerCanvas"></canvas>
+    </div>
+
+    <div class="interviewer-name">Interview AI</div>
+    <div class="interview-type">Behavioral Question Interview</div>
+
+    <div class="transcript" id="transcript"></div>
+
+    <div class="controls">
+      <button class="call-button mute" id="muteBtn" title="Mute/Unmute" style="display: none;">🔇</button>
+      <button class="call-button start" id="callButton">📞</button>
+    </div>
   </div>
 
   <script>
-    const messagesDiv = document.getElementById('messages');
-    const input = document.getElementById('input');
-    const sendBtn = document.getElementById('sendBtn');
+    const callButton = document.getElementById('callButton');
+    const muteBtn = document.getElementById('muteBtn');
+    const statusText = document.getElementById('statusText');
+    const statusIndicator = document.getElementById('statusIndicator');
+    const avatarContainer = document.getElementById('avatarContainer');
+    const transcript = document.getElementById('transcript');
+    const toggleTranscript = document.getElementById('toggleTranscript');
     const floatingBtn = document.getElementById('floatingBtn');
-    const usageDiv = document.getElementById('usage');
+    const audioVisualizer = document.getElementById('audioVisualizer');
+    const visualizerCanvas = document.getElementById('visualizerCanvas');
+    const canvasCtx = visualizerCanvas.getContext('2d');
+    const micSelect = document.getElementById('micSelect');
 
-    let messages = [];
-    let loading = false;
-
-    function addMessage(role, content) {
-      messages.push({ role, content });
-      renderMessages();
-    }
-
-    function renderMessages() {
-      if (messages.length === 0) {
-        messagesDiv.innerHTML = '<div class="empty">Start a conversation...</div>';
-        return;
-      }
-
-      messagesDiv.innerHTML = messages.map(msg => `
-        <div class="message ${msg.role}">
-          <div class="messageContent">${msg.content}</div>
-        </div>
-      `).join('');
-      messagesDiv.scrollTop = messagesDiv.scrollHeight;
-    }
-
-    async function sendMessage() {
-      const text = input.value.trim();
-      if (!text || loading) return;
-
-      addMessage('user', text);
-      input.value = '';
-      loading = true;
-      sendBtn.disabled = true;
-
-      try {
-        const response = await window.electronAPI.apiChat({
-          messages: messages,
-          model: 'gpt-4',
-          stream: false,
-        });
-
-        const content = response.choices[0]?.message?.content || 'No response';
-        addMessage('assistant', content);
-      } catch (error) {
-        console.error('Error:', error);
-        addMessage('assistant', 'Error: Failed to get response');
-      } finally {
-        loading = false;
-        sendBtn.disabled = false;
+    // Set canvas size - will be updated when visualizer is activated
+    function updateCanvasSize() {
+      if (visualizerCanvas) {
+        const rect = visualizerCanvas.getBoundingClientRect();
+        visualizerCanvas.width = rect.width * window.devicePixelRatio;
+        visualizerCanvas.height = rect.height * window.devicePixelRatio;
+        canvasCtx.scale(window.devicePixelRatio, window.devicePixelRatio);
       }
     }
+    
+    // Update canvas on resize
+    window.addEventListener('resize', updateCanvasSize);
 
-    async function loadUsage() {
-      try {
-        const usage = await window.electronAPI.apiUsage();
-        usageDiv.textContent = `Usage: ${usage.used}/${usage.limit} (${usage.remaining} remaining)`;
-      } catch (error) {
-        console.error('Error loading usage:', error);
-        usageDiv.textContent = 'Failed to load usage';
+    let isConnected = false;
+    let isRecording = false;
+    let isMuted = false;
+    let mediaRecorder = null;
+    let audioChunks = [];
+    let conversationHistory = [];
+    let isFirstMessage = true;
+    let currentAudio = null;
+    let audioContext = null;
+    let analyser = null;
+    let microphone = null;
+    let dataArray = null;
+    let animationFrameId = null;
+    let currentStream = null;
+    let audioDevices = [];
+    // Web Speech API disabled - using MediaRecorder + Whisper instead
+    // let speechRecognition = null;
+    let silenceTimer = null;
+    let isSpeaking = false;
+    let isProcessing = false; // Flag to prevent concurrent processing
+    let pendingAudio = null;
+    let recordingChunks = [];
+    let recordingStartTime = null;
+    const SILENCE_THRESHOLD = 750; // 0.75 seconds in milliseconds
+    const MIN_RECORDING_DURATION = 2000; // Minimum 2 seconds of recording before allowing stop
+    const SILENCE_CONFIRMATION_COUNT = 3; // Need 3 consecutive silence checks before stopping
+
+    // Call button handler
+    callButton.addEventListener('click', async () => {
+      if (!isConnected) {
+        await startCall();
+      } else {
+        await endCall();
       }
-    }
+    });
 
-    sendBtn.addEventListener('click', sendMessage);
-    input.addEventListener('keypress', (e) => {
-      if (e.key === 'Enter') sendMessage();
+    // Mute button handler
+    muteBtn.addEventListener('click', () => {
+      isMuted = !isMuted;
+      muteBtn.textContent = isMuted ? '🔇' : '🔊';
+      muteBtn.classList.toggle('active', isMuted);
+      
+      // Pause/resume audio visualization when muted
+      if (isMuted && animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+        animationFrameId = null;
+        canvasCtx.clearRect(0, 0, visualizerCanvas.width, visualizerCanvas.height);
+      } else if (!isMuted && analyser && !animationFrameId) {
+        visualize();
+      }
+    });
+
+    // Toggle transcript
+    toggleTranscript.addEventListener('click', () => {
+      transcript.classList.toggle('active');
+      toggleTranscript.textContent = transcript.classList.contains('active') 
+        ? 'Hide Transcript' 
+        : 'Show Transcript';
     });
 
     floatingBtn.addEventListener('click', () => {
       window.electronAPI.toggleFloatingWindow();
     });
 
-    loadUsage();
-    setInterval(loadUsage, 60000); // Update every minute
+    // Load audio devices on page load
+    window.addEventListener('load', () => {
+      loadAudioDevices();
+    });
+
+    // Reload devices when selection changes (in case new devices are connected)
+    micSelect.addEventListener('click', loadAudioDevices);
+    micSelect.addEventListener('focus', loadAudioDevices);
+
+    async function loadAudioDevices() {
+      try {
+        // Request permission first to get device labels
+        try {
+          const tempStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          tempStream.getTracks().forEach(track => track.stop());
+        } catch (permError) {
+          console.log('Permission not granted yet, will request on call start');
+        }
+        
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        audioDevices = devices.filter(device => device.kind === 'audioinput');
+        
+        // Clear existing options
+        micSelect.innerHTML = '';
+        
+        if (audioDevices.length === 0) {
+          micSelect.innerHTML = '<option value="">No microphones found</option>';
+          return;
+        }
+        
+        // Add default option
+        const defaultOption = document.createElement('option');
+        defaultOption.value = '';
+        defaultOption.textContent = 'Default Microphone';
+        micSelect.appendChild(defaultOption);
+        
+        // Add devices to select
+        audioDevices.forEach((device, index) => {
+          const option = document.createElement('option');
+          option.value = device.deviceId;
+          option.textContent = device.label || `Microphone ${index + 1}`;
+          micSelect.appendChild(option);
+        });
+        
+        // Select default if no selection
+        if (!micSelect.value) {
+          micSelect.value = '';
+        }
+      } catch (error) {
+        console.error('Error loading audio devices:', error);
+        micSelect.innerHTML = '<option value="">Error loading devices</option>';
+      }
+    }
+
+    async function startCall() {
+      try {
+        isConnected = true;
+        callButton.textContent = '📴';
+        callButton.classList.remove('start');
+        callButton.classList.add('end');
+        muteBtn.style.display = 'block';
+        statusText.textContent = 'Connecting...';
+        statusIndicator.classList.remove('disconnected');
+
+        // Get selected device ID
+        const selectedDeviceId = micSelect.value;
+        let constraints;
+        
+        if (selectedDeviceId && selectedDeviceId !== '') {
+          constraints = {
+            audio: { 
+              deviceId: { exact: selectedDeviceId },
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true
+            }
+          };
+        } else {
+          constraints = {
+            audio: {
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true
+            }
+          };
+        }
+
+        // Request microphone permission with selected device
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        currentStream = stream;
+        
+        statusText.textContent = 'Connected - Listening...';
+        avatarContainer.classList.add('listening');
+        audioVisualizer.classList.add('active');
+        
+        // Setup audio visualization after UI is updated
+        setTimeout(() => {
+          updateCanvasSize();
+          setupAudioVisualizer(stream);
+        }, 100);
+
+        // Disable device selector during call
+        micSelect.disabled = true;
+
+        // Start continuous listening
+        startContinuousListening(stream);
+
+        // Send initial message to start interview
+        await sendInitialMessage();
+      } catch (error) {
+        console.error('Error starting call:', error);
+        alert('Failed to start call. Please check microphone permissions and device selection.');
+        await endCall();
+      }
+    }
+
+    async function endCall() {
+      isConnected = false;
+      callButton.textContent = '📞';
+      callButton.classList.remove('end');
+      callButton.classList.add('start');
+      muteBtn.style.display = 'none';
+      statusText.textContent = 'Call ended';
+      statusIndicator.classList.add('disconnected');
+      avatarContainer.classList.remove('listening', 'speaking');
+      audioVisualizer.classList.remove('active');
+
+      // Re-enable device selector
+      micSelect.disabled = false;
+
+      // Stop audio visualization
+      stopAudioVisualizer();
+
+      // Web Speech API disabled - no need to stop
+
+      // Clear silence timer
+      if (silenceTimer) {
+        clearTimeout(silenceTimer);
+        silenceTimer = null;
+      }
+
+      // Stop current audio
+      stopCurrentAudio();
+
+      // Stop all tracks from current stream
+      if (currentStream) {
+        currentStream.getTracks().forEach(track => track.stop());
+        currentStream = null;
+      }
+
+      if (mediaRecorder && isRecording) {
+        mediaRecorder.stop();
+        if (mediaRecorder.stream) {
+          mediaRecorder.stream.getTracks().forEach(track => track.stop());
+        }
+      }
+
+      conversationHistory = [];
+      isFirstMessage = true;
+      isSpeaking = false;
+      isProcessing = false; // Reset processing flag
+    }
+
+    function startContinuousListening(stream) {
+      // Disable Web Speech API in Electron - it has network issues and causes infinite loops
+      // Use MediaRecorder + Whisper API instead (more reliable)
+      console.log('Using MediaRecorder + Whisper API for speech recognition');
+      
+      // Start MediaRecorder as primary method
+      startMediaRecorderWithWhisper(stream);
+      
+      // Also use MediaRecorder for interruption detection
+      startMediaRecorderForInterruption(stream);
+    }
+
+    function startMediaRecorderForInterruption(stream) {
+      // Use MediaRecorder to detect when user speaks during AI playback
+      let recorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+      let chunks = [];
+      let isRecording = false;
+
+      // Monitor audio levels to detect interruption
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      const analyser = audioContext.createAnalyser();
+      const microphone = audioContext.createMediaStreamSource(stream);
+      microphone.connect(analyser);
+      analyser.fftSize = 256;
+      const dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+      function checkAudioLevel() {
+        if (!isConnected) return;
+
+        analyser.getByteFrequencyData(dataArray);
+        const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
+        const volume = average / 255;
+
+        // If user is speaking (volume > threshold) and AI is speaking, interrupt
+        if (volume > 0.15 && isSpeaking && currentAudio) {
+          console.log('User interruption detected');
+          stopCurrentAudio();
+          // The speech recognition will pick up the user's speech
+        }
+
+        requestAnimationFrame(checkAudioLevel);
+      }
+
+      checkAudioLevel();
+    }
+
+    function startMediaRecorderWithWhisper(stream) {
+      let recordingStartTime = null;
+      let lastSpeechTime = null;
+      let isCurrentlyRecording = false;
+      let recordingChunks = [];
+      let currentRecorder = null;
+      let silenceTimer = null;
+      let silenceConfirmationCount = 0; // Track consecutive silence detections
+
+      // Monitor audio levels to detect speech
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      const analyser = audioContext.createAnalyser();
+      const microphone = audioContext.createMediaStreamSource(stream);
+      microphone.connect(analyser);
+      analyser.fftSize = 256;
+      analyser.smoothingTimeConstant = 0.8;
+      const dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+      function resetSilenceTimer() {
+        if (silenceTimer) {
+          clearTimeout(silenceTimer);
+        }
+        silenceTimer = setTimeout(() => {
+          if (isCurrentlyRecording && currentRecorder && currentRecorder.state === 'recording') {
+            // Check if we've recorded for at least the minimum duration
+            const recordingDuration = Date.now() - recordingStartTime;
+            if (recordingDuration >= MIN_RECORDING_DURATION) {
+              console.log('🔇 Silence threshold reached (', SILENCE_THRESHOLD, 'ms), stopping recording. Total duration:', recordingDuration, 'ms');
+              currentRecorder.stop();
+            } else {
+              console.log('⏳ Recording too short (', recordingDuration, 'ms), waiting for minimum duration (', MIN_RECORDING_DURATION, 'ms)');
+              // Reset timer to check again after minimum duration
+              resetSilenceTimer();
+            }
+          }
+        }, SILENCE_THRESHOLD);
+      }
+
+      function checkAudioAndRecord() {
+        if (!isConnected || isMuted) {
+          requestAnimationFrame(checkAudioAndRecord);
+          return;
+        }
+        
+        // Don't record if AI is speaking or if we're processing a request
+        if (isSpeaking || isProcessing) {
+          requestAnimationFrame(checkAudioAndRecord);
+          return;
+        }
+
+        analyser.getByteFrequencyData(dataArray);
+        const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
+        const volume = average / 255;
+
+        const now = Date.now();
+
+        // Start recording if user is speaking and not already recording
+        if (volume > 0.15 && !isCurrentlyRecording) {
+          console.log('🎤 Speech detected! Volume:', volume.toFixed(2), '| isSpeaking:', isSpeaking, '| isConnected:', isConnected, '| isMuted:', isMuted, '| isCurrentlyRecording:', isCurrentlyRecording);
+          console.log('🎤 Starting new recording...');
+          isCurrentlyRecording = true;
+          recordingStartTime = now;
+          lastSpeechTime = now;
+          recordingChunks = [];
+          
+          // Clear any existing timer
+          if (silenceTimer) {
+            clearTimeout(silenceTimer);
+            silenceTimer = null;
+          }
+          
+          try {
+            currentRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+
+            currentRecorder.ondataavailable = (event) => {
+              if (event.data && event.data.size > 0) {
+                recordingChunks.push(event.data);
+              }
+            };
+
+            currentRecorder.onstop = async () => {
+              console.log('⏹️ Recording stopped. Chunks:', recordingChunks.length, '| isCurrentlyRecording:', isCurrentlyRecording);
+              
+              // Clear silence timer
+              if (silenceTimer) {
+                clearTimeout(silenceTimer);
+                silenceTimer = null;
+              }
+              
+              // IMPORTANT: Reset recording state immediately so next recording can start
+              const chunksToProcess = [...recordingChunks]; // Copy chunks before clearing
+              isCurrentlyRecording = false;
+              recordingStartTime = null;
+              lastSpeechTime = null;
+              recordingChunks = []; // Clear immediately
+              silenceConfirmationCount = 0; // Reset silence confirmation counter
+              
+              console.log('✅ Recording state reset. Ready for next recording.');
+              
+              if (chunksToProcess.length > 0) {
+                const audioBlob = new Blob(chunksToProcess, { type: 'audio/webm' });
+                const reader = new FileReader();
+                reader.onloadend = async () => {
+                  const base64Audio = reader.result.split(',')[1];
+                  console.log('📤 Sending audio to Whisper API, size:', base64Audio.length);
+                  await processUserAudio(base64Audio);
+                };
+                reader.readAsDataURL(audioBlob);
+              } else {
+                console.log('⚠️ No audio chunks recorded, resetting to listening state');
+                avatarContainer.classList.add('listening');
+                statusText.textContent = 'Connected - Listening...';
+              }
+            };
+
+            currentRecorder.onerror = (event) => {
+              console.error('MediaRecorder error:', event.error);
+              isCurrentlyRecording = false;
+              if (silenceTimer) {
+                clearTimeout(silenceTimer);
+                silenceTimer = null;
+              }
+              recordingStartTime = null;
+              lastSpeechTime = null;
+              recordingChunks = [];
+            };
+
+            currentRecorder.start(100); // Collect data every 100ms
+            resetSilenceTimer();
+          } catch (e) {
+            console.error('Failed to start MediaRecorder:', e);
+            isCurrentlyRecording = false;
+          }
+        }
+        // Update silence timer if user is still speaking
+        else if (volume > 0.15 && isCurrentlyRecording) {
+          lastSpeechTime = now;
+          silenceConfirmationCount = 0; // Reset silence confirmation on speech
+          resetSilenceTimer(); // Reset timer on continued speech
+        }
+        // Check if we should stop (silence detected) - but only if we've recorded for minimum duration
+        else if (volume <= 0.05 && isCurrentlyRecording && lastSpeechTime && recordingStartTime) {
+          const silenceDuration = now - lastSpeechTime;
+          const recordingDuration = now - recordingStartTime;
+          
+          // Increment silence confirmation counter
+          silenceConfirmationCount++;
+          
+          // Only stop if all conditions are met:
+          // 1. Silence duration exceeds threshold
+          // 2. Total recording duration exceeds minimum
+          // 3. Multiple consecutive silence confirmations (to avoid false stops during natural pauses)
+          if (silenceDuration >= SILENCE_THRESHOLD && 
+              recordingDuration >= MIN_RECORDING_DURATION && 
+              silenceConfirmationCount >= SILENCE_CONFIRMATION_COUNT) {
+            console.log('🔇 Silence confirmed (', silenceConfirmationCount, 'times), duration:', silenceDuration, 'ms, total recording:', recordingDuration, 'ms, stopping recording');
+            if (currentRecorder && currentRecorder.state === 'recording') {
+              currentRecorder.stop();
+            }
+          } else if (silenceDuration >= SILENCE_THRESHOLD && recordingDuration < MIN_RECORDING_DURATION) {
+            console.log('⏳ Silence detected but recording too short (', recordingDuration, 'ms < ', MIN_RECORDING_DURATION, 'ms), continuing...');
+            silenceConfirmationCount = 0; // Reset counter if too short
+          } else if (silenceDuration >= SILENCE_THRESHOLD && silenceConfirmationCount < SILENCE_CONFIRMATION_COUNT) {
+            console.log('⏳ Silence detected but not confirmed yet (', silenceConfirmationCount, '/', SILENCE_CONFIRMATION_COUNT, '), continuing...');
+          }
+        }
+        // Debug: Log if we're not recording but should be (for troubleshooting)
+        else if (volume > 0.15 && !isCurrentlyRecording && !isSpeaking) {
+          // This should not happen often, but log it for debugging
+          // console.log('🔍 High volume detected but not recording. Volume:', volume.toFixed(2), 'isCurrentlyRecording:', isCurrentlyRecording, 'isSpeaking:', isSpeaking);
+        }
+
+        requestAnimationFrame(checkAudioAndRecord);
+      }
+
+      checkAudioAndRecord();
+    }
+
+    function startPeriodicRecording(stream) {
+      // Fallback method - record periodically
+      const recordInterval = setInterval(async () => {
+        if (!isConnected || isMuted) return;
+
+        if (!isRecording) {
+          isRecording = true;
+          audioChunks = [];
+          mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+
+          mediaRecorder.ondataavailable = (event) => {
+            audioChunks.push(event.data);
+          };
+
+          mediaRecorder.onstop = async () => {
+            if (audioChunks.length > 0) {
+              const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+              const reader = new FileReader();
+              reader.onloadend = async () => {
+                const base64Audio = reader.result.split(',')[1];
+                await processUserAudio(base64Audio);
+              };
+              reader.readAsDataURL(audioBlob);
+            }
+            isRecording = false;
+          };
+
+          mediaRecorder.start();
+          setTimeout(() => {
+            if (mediaRecorder && isRecording) {
+              mediaRecorder.stop();
+            }
+          }, 3000); // Record for 3 seconds
+        }
+      }, 4000); // Check every 4 seconds
+    }
+
+    async function processUserAudio(base64Audio) {
+      // Prevent concurrent processing
+      if (isProcessing) {
+        console.log('⚠️ Already processing audio, ignoring new request');
+        return;
+      }
+
+      try {
+        isProcessing = true;
+        console.log('🔄 Processing user audio...');
+        avatarContainer.classList.remove('listening');
+        statusText.textContent = 'Processing...';
+
+        const sttResponse = await window.electronAPI.apiSpeech({
+          audio: base64Audio,
+          model: 'whisper-1',
+        });
+
+        const userText = sttResponse.text;
+        console.log('📝 Whisper transcription:', userText);
+        
+        if (userText && userText.trim()) {
+          addTranscript('You', userText, 'user');
+          console.log('💬 Sending to interview API...');
+          await sendInterviewMessage(userText);
+          console.log('✅ Interview message sent, waiting for response...');
+        } else {
+          console.log('⚠️ Empty transcription, returning to listening state');
+          avatarContainer.classList.add('listening');
+          statusText.textContent = 'Connected - Listening...';
+        }
+      } catch (error) {
+        console.error('❌ Error processing audio:', error);
+        avatarContainer.classList.add('listening');
+        statusText.textContent = 'Connected - Listening...';
+      } finally {
+        isProcessing = false;
+      }
+    }
+
+    async function processUserSpeech(text) {
+      if (!text || !text.trim()) {
+        console.log('Empty text, skipping process');
+        return;
+      }
+
+      console.log('Processing user speech:', text);
+
+      // Stop any current audio playback (user is speaking)
+      if (isSpeaking) {
+        console.log('Stopping current audio playback');
+        stopCurrentAudio();
+      }
+
+      avatarContainer.classList.remove('listening');
+      statusText.textContent = 'Processing...';
+
+      addTranscript('You', text, 'user');
+      await sendInterviewMessage(text);
+    }
+
+    async function sendInitialMessage() {
+      try {
+        let assistantText = '';
+        let transcriptItem = null;
+
+        // Set up streaming listener
+        window.electronAPI.onInterviewStreamChunk((data) => {
+          const { content, fullText } = data;
+          
+          // Update transcript in real-time
+          if (!transcriptItem) {
+            transcriptItem = addTranscript('Interviewer', '', 'interviewer');
+          }
+          
+          // Update the transcript content
+          if (transcriptItem) {
+            transcriptItem.querySelector('.transcript-content').textContent = fullText;
+          }
+          
+          assistantText = fullText;
+          console.log('📡 Stream chunk received (initial), current text length:', fullText.length);
+        });
+
+        // Send empty messages array for first message - ChatGPT will generate welcome
+        const response = await window.electronAPI.apiInterview({
+          messages: [],
+          interviewType: 'bq',
+          isFirstMessage: true,
+        });
+
+        // Remove stream listener
+        window.electronAPI.removeInterviewStreamListener();
+
+        assistantText = response.choices[0]?.message?.content || '';
+        if (assistantText) {
+          conversationHistory.push({ role: 'assistant', content: assistantText });
+          
+          // Update transcript with final text if not already updated
+          if (!transcriptItem) {
+            addTranscript('Interviewer', assistantText, 'interviewer');
+          }
+          
+          await playTTS(assistantText);
+        }
+
+        avatarContainer.classList.add('listening');
+        statusText.textContent = 'Connected - Listening...';
+      } catch (error) {
+        console.error('Error sending initial message:', error);
+        window.electronAPI.removeInterviewStreamListener(); // Clean up listener
+        const errorMessage = error.message || 'Unknown error';
+        statusText.textContent = 'Connection Error';
+        alert(`Failed to connect to API server.\n\n${errorMessage}\n\nPlease make sure the API server is running:\n1. Open a terminal\n2. Run: cd website && npm run dev\n3. Wait for "Ready" message\n4. Try again`);
+        await endCall();
+      }
+    }
+
+    async function sendInterviewMessage(userText) {
+      // Prevent concurrent requests
+      if (isProcessing || isSpeaking) {
+        console.log('⚠️ Already processing or speaking, ignoring new request');
+        return;
+      }
+
+      try {
+        isProcessing = true;
+        console.log('Sending interview message:', userText);
+        // Add user message to conversation history
+        conversationHistory.push({ role: 'user', content: userText });
+
+        let assistantText = '';
+        let transcriptItem = null;
+        let streamListenerSet = false;
+
+        // Set up streaming listener (only once)
+        if (!streamListenerSet) {
+          window.electronAPI.onInterviewStreamChunk((data) => {
+            const { content, fullText } = data;
+            
+            // Update transcript in real-time
+            if (!transcriptItem) {
+              transcriptItem = addTranscript('Interviewer', '', 'interviewer');
+            }
+            
+            // Update the transcript content
+            if (transcriptItem) {
+              const contentEl = transcriptItem.querySelector('.transcript-content');
+              if (contentEl) {
+                contentEl.textContent = fullText;
+              }
+            }
+            
+            assistantText = fullText;
+            console.log('📡 Stream chunk received, current text length:', fullText.length);
+          });
+          streamListenerSet = true;
+        }
+
+        // Send full conversation history to maintain context
+        const response = await window.electronAPI.apiInterview({
+          messages: conversationHistory,
+          interviewType: 'bq',
+          isFirstMessage: false,
+        });
+
+        // Remove stream listener
+        window.electronAPI.removeInterviewStreamListener();
+        streamListenerSet = false;
+
+        assistantText = response.choices[0]?.message?.content || '';
+        console.log('✅ Received complete assistant response, length:', assistantText.length);
+        
+        if (assistantText) {
+          // Add assistant response to conversation history
+          conversationHistory.push({ role: 'assistant', content: assistantText });
+          
+          // Update transcript with final text if not already updated
+          if (!transcriptItem) {
+            addTranscript('Interviewer', assistantText, 'interviewer');
+          }
+          
+          // Play TTS - this will set isSpeaking flag
+          console.log('🎵 Playing TTS, setting isSpeaking to true');
+          await playTTS(assistantText);
+          console.log('✅ TTS playback completed, isSpeaking should be false now');
+        } else {
+          console.warn('⚠️ No assistant response received');
+          avatarContainer.classList.add('listening');
+          statusText.textContent = 'Connected - Listening...';
+        }
+      } catch (error) {
+        console.error('❌ Error sending message:', error);
+        window.electronAPI.removeInterviewStreamListener(); // Clean up listener
+        isSpeaking = false; // Ensure isSpeaking is reset on error
+        avatarContainer.classList.add('listening');
+        statusText.textContent = 'Connected - Listening...';
+      } finally {
+        isProcessing = false;
+      }
+    }
+
+    function stopCurrentAudio() {
+      if (currentAudio) {
+        console.log('🛑 Stopping current audio playback');
+        try {
+          currentAudio.pause();
+          currentAudio.currentTime = 0;
+          // Remove all event listeners to prevent conflicts
+          currentAudio.onended = null;
+          currentAudio.onerror = null;
+          currentAudio.onpause = null;
+          if (currentAudio.src) {
+            URL.revokeObjectURL(currentAudio.src);
+          }
+        } catch (e) {
+          console.error('Error stopping audio:', e);
+        }
+        currentAudio = null;
+      }
+      isSpeaking = false;
+      avatarContainer.classList.remove('speaking');
+      avatarContainer.classList.add('listening');
+      statusText.textContent = 'Connected - Listening...';
+    }
+
+    async function playTTS(text) {
+      // Prevent concurrent TTS playback
+      if (isSpeaking) {
+        console.log('⚠️ Already playing TTS, stopping current and starting new');
+        stopCurrentAudio();
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+
+      try {
+        // CRITICAL: Stop any currently playing audio before starting new one
+        console.log('🛑 Stopping any existing audio before playing new TTS');
+        stopCurrentAudio();
+        
+        // Wait a brief moment to ensure audio is fully stopped
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        // Double-check that no audio is playing
+        if (currentAudio) {
+          console.warn('⚠️ Audio still exists after stop, forcing cleanup');
+          stopCurrentAudio();
+        }
+
+        avatarContainer.classList.remove('listening');
+        avatarContainer.classList.add('speaking');
+        statusText.textContent = 'Interviewer speaking...';
+        isSpeaking = true;
+
+        const ttsResponse = await window.electronAPI.apiTts({
+          text: text,
+          model: 'tts-1',
+          voice: 'alloy',
+          speed: 1.0,
+        });
+
+        const audioData = atob(ttsResponse.audio);
+        const audioArray = new Uint8Array(audioData.length);
+        for (let i = 0; i < audioData.length; i++) {
+          audioArray[i] = audioData.charCodeAt(i);
+        }
+        const blob = new Blob([audioArray], { type: 'audio/mpeg' });
+        const audioUrl = URL.createObjectURL(blob);
+        currentAudio = new Audio(audioUrl);
+
+        // Check for interruption during playback
+        const checkInterruption = () => {
+          if (!currentAudio || !isSpeaking) return;
+          
+          // Check if user is speaking (via analyser if available)
+          if (analyser && dataArray) {
+            analyser.getByteFrequencyData(dataArray);
+            const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
+            const volume = average / 255;
+            
+            if (volume > 0.15) {
+              // User is speaking, interrupt playback
+              console.log('Interruption detected during playback');
+              stopCurrentAudio();
+              return;
+            }
+          }
+          
+          requestAnimationFrame(checkInterruption);
+        };
+        
+        checkInterruption();
+
+        await new Promise((resolve, reject) => {
+          if (!currentAudio) {
+            resolve();
+            return;
+          }
+
+          currentAudio.onended = () => {
+            console.log('Audio playback ended, resetting isSpeaking to false');
+            if (currentAudio && currentAudio.src) {
+              URL.revokeObjectURL(currentAudio.src);
+            }
+            currentAudio = null;
+            isSpeaking = false;
+            avatarContainer.classList.remove('speaking');
+            avatarContainer.classList.add('listening');
+            statusText.textContent = 'Connected - Listening...';
+            console.log('Ready to listen for next user input. isSpeaking:', isSpeaking, 'isConnected:', isConnected);
+            resolve();
+          };
+          currentAudio.onerror = (error) => {
+            console.error('Audio playback error:', error);
+            isSpeaking = false;
+            avatarContainer.classList.remove('speaking');
+            avatarContainer.classList.add('listening');
+            reject(error);
+          };
+          currentAudio.onpause = () => {
+            // Audio was paused (likely interrupted)
+            isSpeaking = false;
+          };
+          currentAudio.play().catch(reject);
+        });
+      } catch (error) {
+        console.error('TTS error:', error);
+        isSpeaking = false;
+        avatarContainer.classList.remove('speaking');
+        avatarContainer.classList.add('listening');
+      }
+    }
+
+    function addTranscript(speaker, text, type) {
+      const item = document.createElement('div');
+      item.className = `transcript-item ${type}`;
+      item.innerHTML = `
+        <div class="transcript-label">${speaker}</div>
+        <div class="transcript-content">${text}</div>
+      `;
+      transcript.appendChild(item);
+      transcript.scrollTop = transcript.scrollHeight;
+      return item; // Return item so it can be updated
+    }
+
+    // Audio visualization functions
+    function setupAudioVisualizer(stream) {
+      try {
+        // Close existing context if any
+        if (audioContext) {
+          audioContext.close();
+        }
+        
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        analyser = audioContext.createAnalyser();
+        microphone = audioContext.createMediaStreamSource(stream);
+        
+        analyser.fftSize = 256;
+        analyser.smoothingTimeConstant = 0.8;
+        const bufferLength = analyser.frequencyBinCount;
+        dataArray = new Uint8Array(bufferLength);
+        
+        microphone.connect(analyser);
+        
+        // Update canvas size
+        visualizerCanvas.width = visualizerCanvas.offsetWidth * window.devicePixelRatio;
+        visualizerCanvas.height = visualizerCanvas.offsetHeight * window.devicePixelRatio;
+        canvasCtx.scale(window.devicePixelRatio, window.devicePixelRatio);
+        
+        // Start visualization
+        visualize();
+      } catch (error) {
+        console.error('Error setting up audio visualizer:', error);
+      }
+    }
+
+    function stopAudioVisualizer() {
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+        animationFrameId = null;
+      }
+      
+      if (microphone) {
+        microphone.disconnect();
+        microphone = null;
+      }
+      
+      if (audioContext) {
+        audioContext.close();
+        audioContext = null;
+      }
+      
+      analyser = null;
+      dataArray = null;
+      
+      // Clear canvas
+      canvasCtx.clearRect(0, 0, visualizerCanvas.width, visualizerCanvas.height);
+    }
+
+    function visualize() {
+      if (!isConnected || !analyser || !dataArray || isMuted) {
+        if (isConnected && !isMuted) {
+          animationFrameId = requestAnimationFrame(visualize);
+        }
+        return;
+      }
+
+      animationFrameId = requestAnimationFrame(visualize);
+
+      analyser.getByteFrequencyData(dataArray);
+
+      const width = visualizerCanvas.offsetWidth;
+      const height = visualizerCanvas.offsetHeight;
+      
+      // Clear canvas
+      canvasCtx.clearRect(0, 0, visualizerCanvas.width, visualizerCanvas.height);
+      canvasCtx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+      canvasCtx.fillRect(0, 0, width, height);
+
+      const barCount = 60;
+      const barWidth = width / barCount;
+      let x = 0;
+
+      // Calculate average volume for overall visualization
+      let sum = 0;
+      for (let i = 0; i < dataArray.length; i++) {
+        sum += dataArray[i];
+      }
+      const average = sum / dataArray.length;
+      const volume = average / 255;
+
+      // Draw waveform bars
+      for (let i = 0; i < barCount; i++) {
+        const dataIndex = Math.floor((i / barCount) * dataArray.length);
+        const barHeight = Math.max(2, (dataArray[dataIndex] / 255) * height * 0.9);
+
+        // Create gradient based on volume
+        let gradient;
+        if (volume > 0.3) {
+          // High volume - green to yellow
+          gradient = canvasCtx.createLinearGradient(x, height, x, height - barHeight);
+          gradient.addColorStop(0, '#4caf50');
+          gradient.addColorStop(0.5, '#8bc34a');
+          gradient.addColorStop(1, '#ffeb3b');
+        } else if (volume > 0.1) {
+          // Medium volume - blue
+          gradient = canvasCtx.createLinearGradient(x, height, x, height - barHeight);
+          gradient.addColorStop(0, '#2196f3');
+          gradient.addColorStop(1, '#64b5f6');
+        } else {
+          // Low volume - gray
+          gradient = canvasCtx.createLinearGradient(x, height, x, height - barHeight);
+          gradient.addColorStop(0, '#757575');
+          gradient.addColorStop(1, '#bdbdbd');
+        }
+
+        canvasCtx.fillStyle = gradient;
+        canvasCtx.fillRect(x, height - barHeight, Math.max(1, barWidth - 2), barHeight);
+
+        x += barWidth;
+      }
+
+      // Draw center line for symmetry (waveform effect)
+      const centerY = height / 2;
+      const centerBarHeight = Math.max(2, volume * height * 0.4);
+      
+      canvasCtx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+      canvasCtx.fillRect(width / 2 - 1, centerY - centerBarHeight / 2, 2, centerBarHeight);
+    }
   </script>
 </body>
 </html>
-
-

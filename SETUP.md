@@ -4,12 +4,20 @@
 
 ### 1. Environment Setup
 
-Create a `.env` file in the root directory (or set environment variables in Vercel):
+Create a `.env.local` file in the `website` directory:
+
+```bash
+cd website
+cp .env.local.example .env.local
+```
+
+Edit `.env.local` and add your OpenAI API key:
 
 ```env
 OPENAI_API_KEY=your_openai_api_key_here
-VERCEL_API_URL=https://your-app.vercel.app
 ```
+
+Get your API key from: https://platform.openai.com/api-keys
 
 ### 2. Install Dependencies
 
@@ -38,35 +46,43 @@ npm run dev
 ```
 
 #### Electron Client
+
+**Important:** The Electron client needs the API server to be running locally.
+
 ```bash
+# Terminal 1: Start the API server
+cd website
+npm install
+npm run dev
+# This starts Next.js on http://127.0.0.1:3000
+
+# Terminal 2: Start Electron
 cd electron
+npm install
 npm run build
 npm start
 ```
 
-### 4. Deploy to Vercel
+The Electron app will automatically connect to `http://127.0.0.1:3000`.
 
-1. Install Vercel CLI:
+### 4. Production Build (Optional)
+
+If you want to build for production:
+
 ```bash
-npm i -g vercel
+cd website
+npm run build
+npm start
 ```
 
-2. Deploy:
-```bash
-vercel
-```
-
-3. Set environment variables in Vercel dashboard:
-   - Go to your project settings
-   - Add `OPENAI_API_KEY` with your OpenAI API key
-
-4. Update `VERCEL_API_URL` in your local `.env` to point to your deployed URL
+This will start the production server on http://localhost:3000
 
 ## API Endpoints
 
-Once deployed, the following endpoints will be available:
+The following API endpoints are available locally at `http://127.0.0.1:3000/api/`:
 
-- `POST /api/chat` - Chat completions
+- `POST /api/interview` - Interview conversation (with prompts)
+- `POST /api/tts` - Text-to-speech conversion
 - `POST /api/speech` - Speech-to-text transcription
 - `GET /api/usage` - Get usage statistics
 - `POST /api/usage` - Increment usage counter
@@ -99,5 +115,6 @@ bazel build //website:website-package
 ### Website Build Errors
 - Clear `.next` directory: `rm -rf website/.next`
 - Reinstall dependencies: `cd website && rm -rf node_modules && npm install`
+
 
 
