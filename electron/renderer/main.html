@@ -245,6 +245,7 @@
       display: flex;
       gap: 0.5rem;
       align-items: center;
+      z-index: 1000;
     }
 
     .header-button {
@@ -255,10 +256,21 @@
       border-radius: 6px;
       cursor: pointer;
       font-size: 0.9rem;
+      z-index: 1000;
+      position: relative;
     }
 
     .header-button:hover {
       background: rgba(255, 255, 255, 0.2);
+    }
+    
+    #demoBtn {
+      background: rgba(76, 175, 80, 0.3);
+      border-color: rgba(76, 175, 80, 0.5);
+    }
+    
+    #demoBtn:hover {
+      background: rgba(76, 175, 80, 0.5);
     }
 
     .device-selector {
@@ -307,6 +319,7 @@
     </div>
     <button class="header-button" id="toggleTranscript">Show Transcript</button>
     <button class="header-button" id="floatingBtn">Floating Window</button>
+    <button class="header-button" id="demoBtn">Realtime Demo</button>
   </div>
 
   <div class="call-container">
@@ -345,6 +358,7 @@
     const transcript = document.getElementById('transcript');
     const toggleTranscript = document.getElementById('toggleTranscript');
     const floatingBtn = document.getElementById('floatingBtn');
+    const demoBtn = document.getElementById('demoBtn');
     const audioVisualizer = document.getElementById('audioVisualizer');
     const visualizerCanvas = document.getElementById('visualizerCanvas');
     const canvasCtx = visualizerCanvas.getContext('2d');
@@ -426,6 +440,35 @@
     floatingBtn.addEventListener('click', () => {
       window.electronAPI.toggleFloatingWindow();
     });
+
+    demoBtn.addEventListener('click', () => {
+      console.log('Realtime Demo button clicked');
+      try {
+        window.electronAPI.openRealtimeDemo();
+        console.log('openRealtimeDemo called successfully');
+      } catch (error) {
+        console.error('Error opening Realtime Demo:', error);
+        alert('Error opening Realtime Demo: ' + error.message);
+      }
+    });
+    
+    // Check if button exists and API is available
+    if (!demoBtn) {
+      console.error('demoBtn not found!');
+    } else {
+      console.log('demoBtn found:', demoBtn);
+    }
+    
+    if (!window.electronAPI) {
+      console.error('window.electronAPI not available!');
+    } else {
+      console.log('window.electronAPI available');
+      if (!window.electronAPI.openRealtimeDemo) {
+        console.error('openRealtimeDemo method not available!');
+      } else {
+        console.log('openRealtimeDemo method available');
+      }
+    }
 
     // Load audio devices on page load
     window.addEventListener('load', () => {

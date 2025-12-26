@@ -2,16 +2,17 @@ import { contextBridge, ipcRenderer } from 'electron';
 
 contextBridge.exposeInMainWorld('electronAPI', {
   toggleFloatingWindow: () => ipcRenderer.invoke('toggle-floating-window'),
-  apiChat: (data: any) => ipcRenderer.invoke('api-chat', data),
-  apiInterview: (data: any) => ipcRenderer.invoke('api-interview', data),
-  apiSpeech: (data: any) => ipcRenderer.invoke('api-speech', data),
-  apiTts: (data: any) => ipcRenderer.invoke('api-tts', data),
-  apiUsage: () => ipcRenderer.invoke('api-usage'),
-  onInterviewStreamChunk: (callback: (data: { content: string; fullText: string }) => void) => {
-    ipcRenderer.on('interview-stream-chunk', (_event, data) => callback(data));
+  openRealtimeDemo: () => ipcRenderer.invoke('open-realtime-demo'),
+  // Realtime API
+  realtimeConnect: (config?: any) => ipcRenderer.invoke('realtime-connect', config),
+  realtimeSendAudio: (audioData: ArrayBuffer) => ipcRenderer.invoke('realtime-send-audio', audioData),
+  realtimeSendText: (text: string) => ipcRenderer.invoke('realtime-send-text', text),
+  realtimeDisconnect: () => ipcRenderer.invoke('realtime-disconnect'),
+  onRealtimeMessage: (callback: (message: any) => void) => {
+    ipcRenderer.on('realtime-message', (_event, message) => callback(message));
   },
-  removeInterviewStreamListener: () => {
-    ipcRenderer.removeAllListeners('interview-stream-chunk');
+  removeRealtimeListener: () => {
+    ipcRenderer.removeAllListeners('realtime-message');
   },
 });
 
@@ -19,13 +20,14 @@ declare global {
   interface Window {
     electronAPI: {
       toggleFloatingWindow: () => Promise<void>;
-      apiChat: (data: any) => Promise<any>;
-      apiInterview: (data: any) => Promise<any>;
-      apiSpeech: (data: any) => Promise<any>;
-      apiTts: (data: any) => Promise<any>;
-      apiUsage: () => Promise<any>;
-      onInterviewStreamChunk: (callback: (data: { content: string; fullText: string }) => void) => void;
-      removeInterviewStreamListener: () => void;
+      openRealtimeDemo: () => Promise<void>;
+      // Realtime API
+      realtimeConnect: (config?: any) => Promise<any>;
+      realtimeSendAudio: (audioData: ArrayBuffer) => Promise<void>;
+      realtimeSendText: (text: string) => Promise<void>;
+      realtimeDisconnect: () => Promise<void>;
+      onRealtimeMessage: (callback: (message: any) => void) => void;
+      removeRealtimeListener: () => void;
     };
   }
 }

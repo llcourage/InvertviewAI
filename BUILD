@@ -1,4 +1,4 @@
-load("@rules_nodejs//nodejs:defs.bzl", "nodejs_binary", "npm_package")
+load("@rules_nodejs//nodejs:defs.bzl", "nodejs_binary")
 
 # Root package definition
 package(default_visibility = ["//visibility:public"])
@@ -17,14 +17,12 @@ nodejs_binary(
     ],
 )
 
-# Website build target
-npm_package(
-    name = "website",
-    srcs = glob([
-        "website/**/*",
-    ]),
-    package_name = "interview-ai-website",
-)
+
+
+
+
+
+
 
 
 

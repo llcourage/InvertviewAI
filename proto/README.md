@@ -49,3 +49,10 @@ protoc --ts_proto_out=. proto/interview.proto
 ```
 
 
+
+
+
+
+
+
+

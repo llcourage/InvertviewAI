@@ -1,15 +1,13 @@
 {
   "name": "interview-ai",
   "version": "1.0.0",
-  "description": "Interview AI - Desktop and Web Application",
+  "description": "Interview AI - Desktop Application",
   "private": true,
   "workspaces": [
-    "electron",
-    "website"
+    "electron"
   ],
   "scripts": {
-    "dev": "npm run dev --workspace=website",
-    "build": "npm run build --workspace=website && npm run build --workspace=electron",
+    "build": "npm run build --workspace=electron",
     "electron": "npm run start --workspace=electron"
   },
   "devDependencies": {
@@ -17,6 +15,13 @@
     "typescript": "^5.3.0"
   }
 }
+
+
+
+
+
+
+
 
 
 
