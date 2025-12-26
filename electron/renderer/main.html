@@ -625,6 +625,10 @@
             const result = await Promise.race([connectPromise, timeoutPromise]);
             console.log('[OK] WebSocket connection established');
             console.log('[DEBUG] Connection result:', result);
+            
+            // Session instructions are already sent in main.ts during connection
+            // The interview prompt is configured in the initial session.update
+            console.log('[OK] Interview AI prompt configured');
           } catch (wsError) {
             const errorMsg = wsError?.message || String(wsError);
             console.error(`[ERROR] WebSocket connection failed: ${errorMsg}`);
@@ -675,6 +679,28 @@
           console.log('[OK] Connected to Realtime API');
           console.log('[LISTEN] Listening for events...');
           console.log(`[DEBUG] Connection state set: isConnected=${isConnected}`);
+          
+          // Trigger AI to start speaking (introduction) after music finishes
+          // Send response.create to trigger AI's introduction automatically
+          setTimeout(async () => {
+            try {
+              console.log('[INFO] Triggering AI introduction after connection...');
+              // Use response.create to trigger AI to speak automatically
+              // AI will introduce itself based on the instructions we sent
+              if (window.electronAPI && window.electronAPI.realtimeCreateResponse) {
+                await window.electronAPI.realtimeCreateResponse();
+                console.log('[OK] AI introduction triggered - AI will start speaking automatically');
+              } else {
+                console.warn('[WARN] realtimeCreateResponse not available, falling back to text trigger');
+                // Fallback: send a text message if createResponse is not available
+                if (window.electronAPI && window.electronAPI.realtimeSendText) {
+                  await window.electronAPI.realtimeSendText('Hello');
+                }
+              }
+            } catch (error) {
+              console.error('[ERROR] Failed to trigger AI introduction:', error);
+            }
+          }, 500); // Small delay after connection to ensure everything is ready
           
           // Enable audio streaming (now that text connection is stable)
           const ENABLE_AUDIO_STREAMING = true;

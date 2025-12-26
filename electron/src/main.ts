@@ -209,11 +209,35 @@ ipcMain.handle('realtime-connect', async (_event, config) => {
         audioChunksDroppedBackpressure = 0;
         lastDiagnosticLog = Date.now();
         
+        // Interview AI prompt for behavior interview
+        const interviewInstructions = `You are Interview AI, a professional behavior interview assistant conducting a behavior interview.
+
+Your role:
+- Your name is Interview AI
+- You are conducting a behavior interview (behavioral interview)
+- You should be professional, friendly, and engaging
+
+Interview flow:
+1. When the user connects, you should first introduce yourself: "Hello, I'm Interview AI. Welcome to your behavior interview. I'm here to help you showcase your experiences and skills. Let's begin!"
+2. After the user responds to your greeting, start asking behavior interview questions
+3. After receiving the user's response to a question, you can either:
+   - Ask a follow-up question to dig deeper into their answer
+   - Move on to the next behavior interview question
+4. Continue the interview naturally, asking relevant follow-ups when appropriate
+
+Guidelines:
+- Ask clear, specific behavior interview questions (e.g., "Tell me about a time when...", "Describe a situation where...")
+- Listen actively to the user's responses
+- Ask follow-up questions to get more details (e.g., "What was your specific role in that situation?", "How did you handle that challenge?")
+- Keep questions relevant to behavior interview topics (leadership, teamwork, problem-solving, conflict resolution, etc.)
+- Be conversational and natural, not robotic
+- Speak clearly and at a moderate pace`;
+
         const sessionConfig = {
           type: 'session.update',
           session: {
             modalities: ['text', 'audio'],
-            instructions: 'You are a helpful assistant. Speak quickly and concisely.',
+            instructions: interviewInstructions,
             voice: 'alloy',
             input_audio_format: 'pcm16',
             output_audio_format: 'pcm16',
@@ -273,6 +297,12 @@ ipcMain.handle('realtime-connect', async (_event, config) => {
           // Always log response.audio.done to confirm audio completion
           if (message.type === 'response.audio.done') {
             console.log('[MSG] Realtime message: response.audio.done - audio response completed');
+          }
+          
+          // Reset hasActiveResponse when response is done
+          if (message.type === 'response.done') {
+            hasActiveResponse = false;
+            console.log('[MSG] Realtime message: response.done - response completed, hasActiveResponse reset');
           }
 
           // Log session.updated to check if input_audio_transcription was applied
@@ -516,6 +546,34 @@ ipcMain.handle('realtime-send-text', async (_event, text: string) => {
   } catch (error: any) {
     console.error('[ERROR] Failed to send text message:', error);
     throw error;
+  }
+});
+
+// Create AI response (trigger AI to speak without user input)
+ipcMain.handle('realtime-create-response', async () => {
+  if (!realtimeWS || realtimeWS.readyState !== WebSocket.OPEN) {
+    throw new Error('WebSocket is not connected');
+  }
+
+  if (hasActiveResponse) {
+    console.log('[WARN] Already has active response, skipping response.create');
+    return { success: false, reason: 'Already has active response' };
+  }
+
+  try {
+    const responseRequest = {
+      type: 'response.create',
+    };
+    
+    console.log('[SEND] Requesting AI response (auto-start)...');
+    realtimeWS.send(JSON.stringify(responseRequest));
+    console.log('[OK] Response request sent');
+    hasActiveResponse = true; // Set immediately to prevent duplicate requests
+    
+    return { success: true };
+  } catch (error: any) {
+    console.error('[ERROR] Failed to create response:', error);
+    throw new Error(`Failed to create response: ${error.message || String(error)}`);
   }
 });
 
