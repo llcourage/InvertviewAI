@@ -39,6 +39,7 @@ bazel-*
 # Electron
 electron/dist/
 electron/out/
+electron/coverage/
 
 # Vercel
 .vercel
