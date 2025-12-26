@@ -378,12 +378,7 @@
     window.addEventListener('resize', updateCanvasSize);
 
     let isConnected = false;
-    let isRecording = false;
     let isMuted = false;
-    let mediaRecorder = null;
-    let audioChunks = [];
-    let conversationHistory = [];
-    let isFirstMessage = true;
     let currentAudio = null;
     let audioContext = null;
     let analyser = null;
@@ -392,17 +387,62 @@
     let animationFrameId = null;
     let currentStream = null;
     let audioDevices = [];
-    // Web Speech API disabled - using MediaRecorder + Whisper instead
-    // let speechRecognition = null;
-    let silenceTimer = null;
     let isSpeaking = false;
-    let isProcessing = false; // Flag to prevent concurrent processing
-    let pendingAudio = null;
-    let recordingChunks = [];
-    let recordingStartTime = null;
-    const SILENCE_THRESHOLD = 750; // 0.75 seconds in milliseconds
-    const MIN_RECORDING_DURATION = 2000; // Minimum 2 seconds of recording before allowing stop
-    const SILENCE_CONFIRMATION_COUNT = 3; // Need 3 consecutive silence checks before stopping
+    let isProcessing = false;
+    
+    // Realtime API variables
+    let trackProcessor = null;
+    let audioStreamReader = null;
+    let isAudioStreaming = false;
+    
+    // Audio playback queue system
+    if (!window.audioPlaybackQueue) {
+      window.audioPlaybackQueue = [];
+      window.audioPlaybackScheduledTime = 0;
+      window.audioPlaybackIsPlaying = false;
+    }
+    
+    // Helper functions for audio processing
+    function floatTo16BitPCM(input) {
+      const output = new Int16Array(input.length);
+      for (let i = 0; i < input.length; i++) {
+        const s = Math.max(-1, Math.min(1, input[i]));
+        output[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+      }
+      return output;
+    }
+    
+    function arrayBufferToBase64(buffer) {
+      let binary = '';
+      const bytes = new Uint8Array(buffer);
+      const len = bytes.byteLength;
+      const chunkSize = 0x8000; // 32KB chunks
+      
+      for (let i = 0; i < len; i += chunkSize) {
+        binary += String.fromCharCode.apply(
+          null, 
+          bytes.subarray(i, Math.min(i + chunkSize, len))
+        );
+      }
+      return window.btoa(binary);
+    }
+    
+    function resampleAudio(input, inputSampleRate, outputSampleRate) {
+      const ratio = inputSampleRate / outputSampleRate;
+      const outputLength = Math.round(input.length / ratio);
+      const output = new Float32Array(outputLength);
+      
+      for (let i = 0; i < outputLength; i++) {
+        const index = i * ratio;
+        const indexFloor = Math.floor(index);
+        const indexCeil = Math.min(indexFloor + 1, input.length - 1);
+        const fraction = index - indexFloor;
+        
+        output[i] = input[indexFloor] * (1 - fraction) + input[indexCeil] * fraction;
+      }
+      
+      return output;
+    }
 
     // Call button handler
     callButton.addEventListener('click', async () => {
@@ -525,65 +565,195 @@
     }
 
     async function startCall() {
-      try {
-        isConnected = true;
-        callButton.textContent = '📴';
-        callButton.classList.remove('start');
-        callButton.classList.add('end');
-        muteBtn.style.display = 'block';
-        statusText.textContent = 'Connecting...';
-        statusIndicator.classList.remove('disconnected');
-
-        // Get selected device ID
-        const selectedDeviceId = micSelect.value;
-        let constraints;
+      // Prevent immediate execution to avoid blocking
+      setTimeout(async () => {
+        try {
+          console.log('[DEBUG] Start call button clicked');
+          
+          // Prevent multiple clicks
+          if (isConnected) {
+            console.log('[WARN] Already connected');
+            return;
+          }
+          
+          // Disable button immediately to prevent double-click
+          callButton.disabled = true;
+          callButton.textContent = '📴';
+          callButton.classList.remove('start');
+          callButton.classList.add('end');
+          muteBtn.style.display = 'block';
+          statusText.textContent = 'Connecting to Realtime API...';
+          statusIndicator.classList.remove('disconnected');
+          
+          // Check if electronAPI is available
+          if (!window.electronAPI) {
+            console.error('[ERROR] Electron API not available. Make sure you are running in Electron.');
+            callButton.disabled = false;
+            callButton.textContent = '📞';
+            callButton.classList.remove('end');
+            callButton.classList.add('start');
+            alert('Electron API not available');
+            return;
+          }
+          
+          console.log('[DEBUG] electronAPI available, checking realtimeConnect...');
+          if (!window.electronAPI.realtimeConnect) {
+            console.error('[ERROR] realtimeConnect method not available');
+            callButton.disabled = false;
+            callButton.textContent = '📞';
+            callButton.classList.remove('end');
+            callButton.classList.add('start');
+            alert('realtimeConnect method not available');
+            return;
+          }
+          console.log('[DEBUG] realtimeConnect method found');
+          
+          // Connect to Realtime API with timeout
+          console.log('[CONNECT] Establishing WebSocket connection...');
+          try {
+            // Use Promise.race to add timeout
+            const connectPromise = window.electronAPI.realtimeConnect({});
+            const timeoutPromise = new Promise((_, reject) => {
+              setTimeout(() => reject(new Error('Connection timeout after 15 seconds')), 15000);
+            });
+            
+            const result = await Promise.race([connectPromise, timeoutPromise]);
+            console.log('[OK] WebSocket connection established');
+            console.log('[DEBUG] Connection result:', result);
+          } catch (wsError) {
+            const errorMsg = wsError?.message || String(wsError);
+            console.error(`[ERROR] WebSocket connection failed: ${errorMsg}`);
+            callButton.disabled = false;
+            callButton.textContent = '📞';
+            callButton.classList.remove('end');
+            callButton.classList.add('start');
+            throw wsError;
+          }
         
-        if (selectedDeviceId && selectedDeviceId !== '') {
-          constraints = {
-            audio: { 
-              deviceId: { exact: selectedDeviceId },
-              echoCancellation: true,
-              noiseSuppression: true,
-              autoGainControl: true
+          // Set up message listener BEFORE marking as connected
+          try {
+            // Remove any existing listeners first
+            if (window.electronAPI.removeRealtimeListener) {
+              window.electronAPI.removeRealtimeListener();
             }
-          };
-        } else {
-          constraints = {
-            audio: {
-              echoCancellation: true,
-              noiseSuppression: true,
-              autoGainControl: true
-            }
-          };
+            
+            // Add new listener with error handling wrapper
+            const safeHandler = (message) => {
+              try {
+                handleRealtimeMessage(message);
+              } catch (error) {
+                console.error('[ERROR] Error in message handler:', error);
+              }
+            };
+            
+            window.electronAPI.onRealtimeMessage(safeHandler);
+            console.log('[OK] Message listener registered');
+          } catch (listenerError) {
+            console.error(`[ERROR] Failed to register message listener: ${listenerError.message}`);
+            callButton.disabled = false;
+            callButton.textContent = '📞';
+            callButton.classList.remove('end');
+            callButton.classList.add('start');
+            throw listenerError;
+          }
+          
+          // Mark as connected FIRST, before starting audio
+          isConnected = true;
+          statusText.textContent = 'Connected - Ready to Chat';
+          statusIndicator.classList.remove('disconnected');
+          callButton.disabled = true;
+          
+          console.log('[OK] Connected to Realtime API');
+          console.log('[LISTEN] Listening for events...');
+          console.log(`[DEBUG] Connection state set: isConnected=${isConnected}`);
+          
+          // Enable audio streaming (now that text connection is stable)
+          const ENABLE_AUDIO_STREAMING = true;
+          
+          if (ENABLE_AUDIO_STREAMING) {
+            // Start audio streaming (using Web Audio API with MediaStreamTrackProcessor for PCM16)
+            setTimeout(async () => {
+              try {
+                console.log('[AUDIO] Starting audio stream in 1 second...');
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                if (!isConnected) {
+                  console.log('[WARN] Connection lost, skipping audio start');
+                  return;
+                }
+                
+                // Get selected device ID
+                const selectedDeviceId = micSelect.value;
+                let constraints;
+                
+                if (selectedDeviceId && selectedDeviceId !== '') {
+                  constraints = {
+                    audio: { 
+                      deviceId: { exact: selectedDeviceId },
+                      echoCancellation: true,
+                      noiseSuppression: true,
+                      autoGainControl: true,
+                      sampleRate: 24000,
+                      channelCount: 1
+                    }
+                  };
+                } else {
+                  constraints = {
+                    audio: {
+                      echoCancellation: true,
+                      noiseSuppression: true,
+                      autoGainControl: true,
+                      sampleRate: 24000,
+                      channelCount: 1
+                    }
+                  };
+                }
+
+                // Request microphone permission with selected device
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                currentStream = stream;
+                
+                statusText.textContent = 'Connected - Listening...';
+                avatarContainer.classList.add('listening');
+                audioVisualizer.classList.add('active');
+                
+                // Setup audio visualization after UI is updated
+                setTimeout(() => {
+                  updateCanvasSize();
+                  setupAudioVisualizer(stream);
+                }, 100);
+
+                // Disable device selector during call
+                micSelect.disabled = true;
+                
+                await startAudioStreaming();
+              } catch (audioError) {
+                console.error(`[WARN] Audio streaming failed: ${audioError.message}`);
+                console.log('[INFO] Connection will continue without audio input');
+                // Don't throw - allow connection without audio
+              }
+            }, 1000);
+          } else {
+            console.log('[INFO] Audio streaming is DISABLED for testing');
+          }
+          
+        } catch (error) {
+          console.error('[ERROR] Connection error caught:', error);
+          console.error(`[ERROR] Connection error: ${error.message || String(error)}`);
+          
+          // Reset connection state on error
+          isConnected = false;
+          statusText.textContent = 'Connection Failed';
+          statusIndicator.classList.add('disconnected');
+          callButton.disabled = false;
+          callButton.textContent = '📞';
+          callButton.classList.remove('end');
+          callButton.classList.add('start');
+          muteBtn.style.display = 'none';
+          
+          alert(`Failed to start call: ${error.message || 'Unknown error'}`);
         }
-
-        // Request microphone permission with selected device
-        const stream = await navigator.mediaDevices.getUserMedia(constraints);
-        currentStream = stream;
-        
-        statusText.textContent = 'Connected - Listening...';
-        avatarContainer.classList.add('listening');
-        audioVisualizer.classList.add('active');
-        
-        // Setup audio visualization after UI is updated
-        setTimeout(() => {
-          updateCanvasSize();
-          setupAudioVisualizer(stream);
-        }, 100);
-
-        // Disable device selector during call
-        micSelect.disabled = true;
-
-        // Start continuous listening
-        startContinuousListening(stream);
-
-        // Send initial message to start interview
-        await sendInitialMessage();
-      } catch (error) {
-        console.error('Error starting call:', error);
-        alert('Failed to start call. Please check microphone permissions and device selection.');
-        await endCall();
-      }
+      }, 100); // Small delay to prevent blocking
     }
 
     async function endCall() {
@@ -603,16 +773,22 @@
       // Stop audio visualization
       stopAudioVisualizer();
 
-      // Web Speech API disabled - no need to stop
-
-      // Clear silence timer
-      if (silenceTimer) {
-        clearTimeout(silenceTimer);
-        silenceTimer = null;
-      }
+      // Stop audio streaming
+      stopAudioStreaming();
 
       // Stop current audio
       stopCurrentAudio();
+
+      // Clear audio queue
+      clearAudioQueue();
+
+      // Disconnect from Realtime API
+      try {
+        window.electronAPI.removeRealtimeListener();
+        await window.electronAPI.realtimeDisconnect();
+      } catch (error) {
+        console.error('Error disconnecting from Realtime API:', error);
+      }
 
       // Stop all tracks from current stream
       if (currentStream) {
@@ -620,32 +796,746 @@
         currentStream = null;
       }
 
-      if (mediaRecorder && isRecording) {
-        mediaRecorder.stop();
-        if (mediaRecorder.stream) {
-          mediaRecorder.stream.getTracks().forEach(track => track.stop());
+      isSpeaking = false;
+      isProcessing = false;
+    }
+
+    // ========== Realtime API Functions ==========
+    
+    // Handle Realtime API messages (real connection) - copied from realtime-demo.html
+    function handleRealtimeMessage(message) {
+      try {
+        // Validate message
+        if (!message || typeof message !== 'object') {
+          console.warn('[WARN] Invalid message received:', message);
+          return;
         }
+        
+        console.log(`[EVENT] ${message.type || 'unknown'}`);
+        
+        switch (message.type) {
+          // User message transcription completed
+          case 'conversation.item.input_audio_transcription.completed':
+            try {
+              console.log('[EVENT] Received user transcription event');
+              const userText = message.transcript;
+              if (userText && typeof userText === 'string' && userText.trim()) {
+                console.log(`[USER] User said: "${userText}"`);
+                addTranscript('You', userText, 'user');
+              } else {
+                console.log(`[WARN] User transcription is empty or invalid. transcript:`, userText);
+              }
+            } catch (e) {
+              console.error('[ERROR] Error processing user message:', e);
+            }
+            break;
+            
+          // Assistant message transcription completed (audio mode)
+          case 'response.audio_transcript.done':
+            try {
+              const assistantText = message.transcript;
+              if (assistantText && typeof assistantText === 'string' && assistantText.trim()) {
+                console.log(`[AI] Assistant said: "${assistantText}"`);
+                addTranscript('Interviewer', assistantText, 'interviewer');
+              }
+            } catch (e) {
+              console.error('[ERROR] Error processing assistant message:', e);
+            }
+            break;
+            
+          // Assistant text response (text mode)
+          case 'response.text.done':
+            try {
+              const assistantText = message.text;
+              if (assistantText && typeof assistantText === 'string' && assistantText.trim()) {
+                console.log(`[AI] Assistant replied: "${assistantText}"`);
+                addTranscript('Interviewer', assistantText, 'interviewer');
+              }
+            } catch (e) {
+              console.error('[ERROR] Error processing assistant text response:', e);
+            }
+            break;
+            
+          // Response created - AI started responding
+          case 'response.created':
+            console.log('[AI] Assistant started responding...');
+            // Clear any previous audio queue and reset
+            clearAudioQueue();
+            window.audioPlaybackScheduledTime = 0;
+            if (window.playbackAudioContext) {
+              window.audioPlaybackScheduledTime = window.playbackAudioContext.currentTime;
+            }
+            avatarContainer.classList.remove('listening');
+            avatarContainer.classList.add('speaking');
+            statusText.textContent = 'Interviewer speaking...';
+            isSpeaking = true;
+            break;
+            
+          // Response done - AI finished responding
+          case 'response.done':
+            console.log('[AI] Assistant finished responding');
+            // Queue will finish playing naturally, no need to clear
+            avatarContainer.classList.remove('speaking');
+            avatarContainer.classList.add('listening');
+            statusText.textContent = 'Connected - Listening...';
+            isSpeaking = false;
+            break;
+            
+          // Conversation item created (user message)
+          case 'conversation.item.created':
+            console.log('[INFO] Conversation item created');
+            // Check if there's already a transcript in the item
+            if (message.item && message.item.content) {
+              const audioContent = message.item.content.find(c => c.type === 'input_audio');
+              if (audioContent && audioContent.transcript) {
+                console.log(`[USER] User said (from item): "${audioContent.transcript}"`);
+                addTranscript('You', audioContent.transcript, 'user');
+              } else {
+                console.log('[INFO] Conversation item created, waiting for transcription...');
+              }
+            }
+            break;
+            
+          // Assistant audio data (for playback)
+          case 'response.audio.delta':
+            // Play AI audio response
+            if (message.delta) {
+              try {
+                console.log(`[AUDIO] Received audio delta, length: ${message.delta.length} bytes`);
+                playAudioChunk(message.delta);
+                console.log(`[AUDIO] Audio chunk queued successfully`);
+              } catch (error) {
+                console.error('[ERROR] Failed to play audio chunk:', error);
+                console.error('[ERROR] Error stack:', error.stack);
+              }
+            } else {
+              console.warn('[WARN] response.audio.delta received but message.delta is empty');
+            }
+            break;
+            
+          // Input audio buffer events (confirmation that audio was received)
+          case 'input_audio_buffer.speech_started':
+            console.log('[VAD] Speech started detected');
+            avatarContainer.classList.add('listening');
+            statusText.textContent = 'Speaking...';
+            break;
+            
+          case 'input_audio_buffer.speech_stopped':
+            console.log('[VAD] Speech stopped detected');
+            avatarContainer.classList.remove('listening');
+            statusText.textContent = 'Processing...';
+            break;
+            
+          case 'input_audio_buffer.committed':
+            console.log('[VAD] Audio buffer committed (user finished speaking)');
+            avatarContainer.classList.remove('listening');
+            statusText.textContent = 'AI is thinking...';
+            break;
+            
+          // Connection closed event
+          case 'connection.closed':
+            try {
+              const closeCode = message.code || 'Unknown';
+              const closeReason = message.reason || 'Unknown';
+              console.log(`[DISCONNECT] Connection closed by server. Code: ${closeCode}`);
+              console.log(`[DISCONNECT] Reason: ${closeReason}`);
+              
+              // Reset connection state
+              isConnected = false;
+              statusText.textContent = 'Disconnected';
+              statusIndicator.classList.add('disconnected');
+              
+              // Stop audio streaming
+              stopAudioStreaming();
+              
+              if (closeCode === 1008) {
+                console.error('[ERROR] Policy Violation - likely invalid audio format!');
+              }
+            } catch (e) {
+              console.error('[ERROR] Error handling connection.closed:', e);
+            }
+            break;
+            
+          // Response text delta (streaming text)
+          case 'response.text.delta':
+            // Text is streaming in, but we'll wait for response.text.done
+            if (message.delta) {
+              console.log(`[AI] Text streaming: "${message.delta}"`);
+            }
+            break;
+            
+          // Session update confirmation
+          case 'session.updated':
+            console.log(`[OK] Session configured successfully`);
+            break;
+            
+          // Error handling
+          case 'error':
+            try {
+              console.error(`[ERROR] Error: ${JSON.stringify(message.error || message)}`);
+            } catch (e) {
+              console.error(`[ERROR] Error occurred (could not stringify)`);
+            }
+            break;
+            
+          default:
+            // Log all unknown events with full details for debugging
+            console.log('[DEBUG] Unknown event type:', message.type);
+            console.log('[DEBUG] Full message:', JSON.stringify(message, null, 2));
+        }
+      } catch (error) {
+        console.error('[ERROR] Error in handleRealtimeMessage:', error);
+      }
+    }
+    
+    // Start audio streaming to Realtime API - using Web Audio API for PCM16 conversion
+    async function startAudioStreaming() {
+      // === 【关键修复】如果已经在推流，直接阻止第二次启动 ===
+      if (isAudioStreaming) {
+        console.warn('[WARN] Audio streaming is already active. Ignoring duplicate start request.');
+        return;
       }
 
-      conversationHistory = [];
-      isFirstMessage = true;
-      isSpeaking = false;
-      isProcessing = false; // Reset processing flag
-    }
+      console.log('[DEBUG] startAudioStreaming called - using Web Audio API');
+      isAudioStreaming = true; // 【关键】上锁
 
-    function startContinuousListening(stream) {
-      // Disable Web Speech API in Electron - it has network issues and causes infinite loops
-      // Use MediaRecorder + Whisper API instead (more reliable)
-      console.log('Using MediaRecorder + Whisper API for speech recognition');
-      
-      // Start MediaRecorder as primary method
-      startMediaRecorderWithWhisper(stream);
-      
-      // Also use MediaRecorder for interruption detection
-      startMediaRecorderForInterruption(stream);
-    }
+      try {
+        // Check if getUserMedia is available
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          throw new Error('getUserMedia is not supported in this browser');
+        }
+        
+        console.log('[DEBUG] About to request getUserMedia');
+        
+        // Get user media with enhanced echo cancellation settings
+        // Note: currentStream is already set in startCall()
+        if (!currentStream) {
+          throw new Error('No media stream available');
+        }
+        
+        // Create AudioContext for processing
+        // Try to use 24kHz, but fallback to default if not supported
+        let targetSampleRate = 24000;
+        try {
+          audioContext = new (window.AudioContext || window.webkitAudioContext)({
+            sampleRate: targetSampleRate
+          });
+          // Check if the actual sample rate matches
+          if (audioContext.sampleRate !== targetSampleRate) {
+            console.log(`[WARN] Requested 24kHz but got ${audioContext.sampleRate}Hz - will resample`);
+            targetSampleRate = audioContext.sampleRate;
+          }
+        } catch (err) {
+          // Fallback to default sample rate
+          console.log('[WARN] Could not create AudioContext with 24kHz, using default');
+          audioContext = new (window.AudioContext || window.webkitAudioContext)();
+          targetSampleRate = audioContext.sampleRate;
+        }
+        
+        console.log(`[AUDIO] AudioContext created with sample rate: ${audioContext.sampleRate}Hz`);
+        
+        // Wait for AudioContext to be ready
+        console.log('[AUDIO] AudioContext initial state:', audioContext.state);
+        if (audioContext.state === 'suspended') {
+          console.log('[AUDIO] Resuming suspended AudioContext...');
+          await audioContext.resume();
+          console.log('[AUDIO] AudioContext state after resume:', audioContext.state);
+        }
+        
+        // Ensure AudioContext is running
+        if (audioContext.state !== 'running') {
+          console.warn('[AUDIO] AudioContext is not running, attempting to resume...');
+          try {
+            await audioContext.resume();
+            console.log('[AUDIO] AudioContext state after force resume:', audioContext.state);
+          } catch (resumeErr) {
+            console.error('[AUDIO] Failed to resume AudioContext:', resumeErr);
+          }
+        }
+        
+        // Verify MediaStream tracks are active
+        const tracks = currentStream.getTracks();
+        console.log('[AUDIO] MediaStream tracks before creating source:', tracks.map(t => ({
+          kind: t.kind,
+          enabled: t.enabled,
+          readyState: t.readyState,
+          muted: t.muted
+        })));
+        
+        // Ensure all audio tracks are enabled
+        tracks.forEach(track => {
+          if (track.kind === 'audio') {
+            if (!track.enabled) {
+              console.warn('[AUDIO] Audio track is disabled, enabling...');
+              track.enabled = true;
+            }
+            if (track.readyState !== 'live') {
+              console.warn('[AUDIO] Audio track is not live:', track.readyState);
+            }
+          }
+        });
+        
+        // CRITICAL FIX: ScriptProcessorNode doesn't work in Electron
+        // Use MediaStreamTrackProcessor API to get raw PCM data directly
+        console.log('[AUDIO] ScriptProcessorNode not working in Electron, using MediaStreamTrackProcessor...');
+        
+        let trackProcessor;
+        let readableStream;
+        
+        try {
+          // Get audio track from MediaStream
+          const audioTrack = currentStream.getAudioTracks()[0];
+          if (!audioTrack) {
+            throw new Error('No audio track found in MediaStream');
+          }
+          
+          console.log('[AUDIO] Audio track found:', {
+            label: audioTrack.label,
+            enabled: audioTrack.enabled,
+            readyState: audioTrack.readyState
+          });
+          
+          // Check if MediaStreamTrackProcessor is available
+          if (typeof MediaStreamTrackProcessor === 'undefined') {
+            throw new Error('MediaStreamTrackProcessor is not supported in this browser/Electron version');
+          }
+          
+          // Create MediaStreamTrackProcessor
+          trackProcessor = new MediaStreamTrackProcessor({ track: audioTrack });
+          readableStream = trackProcessor.readable;
+          // Store globally for cleanup
+          window._trackProcessor = trackProcessor;
+          console.log('[AUDIO] MediaStreamTrackProcessor created successfully');
+        } catch (err) {
+          console.error('[AUDIO] Failed to create MediaStreamTrackProcessor:', err);
+          throw err;
+        }
+        
+        // Critical fix: Send lock to prevent data backlog causing crash
+        let isSending = false;
+        let lastSendTime = 0;
+        const PROCESS_INTERVAL = 50; // Limit processing frequency: minimum 50ms interval
 
-    function startMediaRecorderForInterruption(stream) {
+        // Diagnostic counters for frontend
+        let frontendProcessCount = 0;
+        let frontendSendCount = 0;
+        let frontendErrorCount = 0;
+        
+        // Function to process audio frame from MediaStreamTrackProcessor
+        async function processAudioFrame(audioFrame) {
+          try {
+            const now = Date.now();
+            
+            // Throttle processing
+            if (!isConnected || isSending || (now - lastSendTime < PROCESS_INTERVAL) || isMuted) {
+              audioFrame.close(); // Release the frame
+              return;
+            }
+            
+            isSending = true;
+            lastSendTime = now;
+            
+            frontendProcessCount++;
+            
+            if (frontendProcessCount <= 5) {
+              console.log(`[AUDIO] Processing audio frame (count: ${frontendProcessCount})`);
+            }
+            
+            // Get raw PCM data from AudioFrame
+            // AudioFrame has format property and copyTo method
+            if (frontendProcessCount <= 5) {
+              console.log(`[AUDIO] AudioFrame properties:`, {
+                timestamp: audioFrame.timestamp,
+                format: audioFrame.format,
+                numberOfChannels: audioFrame.numberOfChannels,
+                numberOfFrames: audioFrame.numberOfFrames,
+                sampleRate: audioFrame.sampleRate
+              });
+            }
+            
+            const numberOfChannels = audioFrame.numberOfChannels;
+            const numberOfFrames = audioFrame.numberOfFrames;
+            const sampleRate = audioFrame.sampleRate;
+            
+            if (frontendProcessCount <= 5) {
+              console.log(`[AUDIO] Audio frame: ${numberOfFrames} frames, ${numberOfChannels} channels, ${sampleRate}Hz`);
+            }
+            
+            // Get PCM data from first channel (mono)
+            // AudioFrame.copyTo copies data to a destination buffer
+            const pcmData = new Float32Array(numberOfFrames);
+            try {
+              // copyTo method signature: copyTo(destination, options)
+              // For audio, we copy the first channel (planeIndex: 0)
+              audioFrame.copyTo(pcmData, { planeIndex: 0 });
+            } catch (copyError) {
+              console.error('[AUDIO] Failed to copy audio data:', copyError);
+              audioFrame.close();
+              isSending = false;
+              return;
+            }
+            
+            // Resample to 24kHz if needed
+            let resampledData = pcmData;
+            if (sampleRate !== 24000) {
+              if (frontendProcessCount <= 5) {
+                console.log(`[AUDIO] Resampling from ${sampleRate}Hz to 24kHz`);
+              }
+              resampledData = resampleAudio(pcmData, sampleRate, 24000);
+            }
+            
+            // Convert to PCM16
+            const pcm16 = floatTo16BitPCM(resampledData);
+            
+            if (frontendProcessCount <= 5) {
+              console.log(`[AUDIO] Converted to PCM16: ${pcm16.length} samples`);
+            }
+            
+            // Convert to Base64
+            const base64Audio = arrayBufferToBase64(pcm16.buffer);
+            
+            if (frontendProcessCount <= 5) {
+              console.log(`[AUDIO] Converted to Base64: ${base64Audio.length} chars`);
+            }
+            
+            // Send to main process
+            if (window.electronAPI && window.electronAPI.realtimeSendAudio) {
+              frontendSendCount++;
+              
+              if (frontendSendCount <= 5) {
+                console.log(`[AUDIO] Sending audio chunk #${frontendSendCount} to main process...`);
+              }
+              
+              await window.electronAPI.realtimeSendAudio(base64Audio);
+              
+              if (frontendSendCount <= 5) {
+                console.log(`[AUDIO] Audio chunk #${frontendSendCount} sent successfully`);
+              }
+            } else {
+              console.error('[AUDIO] realtimeSendAudio API not available!');
+            }
+            
+            // Release the frame
+            audioFrame.close();
+            isSending = false;
+          } catch (error) {
+            frontendErrorCount++;
+            console.error(`[AUDIO] Error processing audio frame #${frontendErrorCount}:`, error);
+            console.error('[AUDIO] Error stack:', error?.stack);
+            try {
+              audioFrame.close();
+            } catch (e) {
+              // Ignore errors when closing
+            }
+            isSending = false;
+          }
+        }
+        
+        // Use MediaStreamTrackProcessor to read audio frames
+        // NOTE: Do NOT connect source to destination - this causes echo/feedback!
+        // MediaStreamTrackProcessor can read audio without playing it back
+        try {
+          console.log('[AUDIO] Setting up MediaStreamTrackProcessor reader...');
+          
+          // DO NOT connect source to destination - this would cause echo/feedback
+          // source.connect(audioContext.destination); // REMOVED - causes echo!
+          console.log('[AUDIO] Source NOT connected to destination (preventing echo)');
+          
+          // Set up stream reader
+          const reader = readableStream.getReader();
+          window._audioStreamReader = reader;
+          
+          // Process audio frames asynchronously
+          (async () => {
+            try {
+              while (true) {
+                const { done, value } = await reader.read();
+                
+                if (done) {
+                  console.log('[AUDIO] Stream reader finished');
+                  break;
+                }
+                
+                if (value) {
+                  // Process the audio frame
+                  await processAudioFrame(value);
+                }
+              }
+            } catch (streamError) {
+              console.error('[AUDIO] Stream reader error:', streamError);
+              frontendErrorCount++;
+            }
+          })();
+          
+          console.log('[AUDIO] MediaStreamTrackProcessor reader started');
+          
+        } catch (err) {
+          console.error('[AUDIO] Failed to setup MediaStreamTrackProcessor:', err);
+          throw err;
+        }
+        
+        console.log('[DEBUG] MediaStreamTrackProcessor connected, audio streaming ready');
+        console.log(`[INFO] Converting to PCM16 mono 24kHz (from ${targetSampleRate}Hz)`);
+        console.log('[AUDIO] Audio streaming fully initialized, waiting for audio frames...');
+        
+        // Add immediate check (after 100ms) to see if MediaStreamTrackProcessor is working
+        setTimeout(() => {
+          console.log('[AUDIO] 100ms check: frontendProcessCount =', frontendProcessCount);
+          if (frontendProcessCount === 0) {
+            console.warn('[AUDIO] WARNING: MediaStreamTrackProcessor has not produced data after 100ms');
+            console.warn('[AUDIO] AudioContext state:', audioContext?.state);
+            console.warn('[AUDIO] MediaStream active:', currentStream?.active);
+            console.warn('[AUDIO] This may indicate:');
+            console.warn('[AUDIO] 1. No audio data is being captured');
+            console.warn('[AUDIO] 2. Microphone is muted or not producing data');
+            console.warn('[AUDIO] 3. MediaStreamTrackProcessor is not receiving data from MediaStream');
+          } else {
+            console.log('[AUDIO] SUCCESS: MediaStreamTrackProcessor is working!');
+          }
+        }, 100);
+        
+      } catch (error) {
+        console.error('[ERROR] Error starting audio streaming:', error);
+        isAudioStreaming = false;
+        throw error;
+      }
+    }
+    
+    // Stop audio streaming - copied from realtime-demo.html
+    function stopAudioStreaming() {
+      try {
+        // Stop stream reader if it exists
+        if (window._audioStreamReader) {
+          try {
+            window._audioStreamReader.cancel();
+            window._audioStreamReader.releaseLock();
+            console.log('[AUDIO] Stream reader stopped');
+          } catch (err) {
+            console.error('[AUDIO] Error stopping stream reader:', err);
+          }
+          window._audioStreamReader = null;
+        }
+        
+        // Close track processor if it exists
+        try {
+          if (window._trackProcessor) {
+            // MediaStreamTrackProcessor doesn't have a close method, but we can stop the track
+            const audioTrack = currentStream?.getAudioTracks()[0];
+            if (audioTrack) {
+              audioTrack.stop();
+            }
+            window._trackProcessor = null;
+          }
+        } catch (err) {
+          console.error('[AUDIO] Error closing track processor:', err);
+          // Continue cleanup even if this fails
+        }
+        
+        // Stop media stream tracks
+        if (currentStream) {
+          try {
+            currentStream.getTracks().forEach(track => {
+              track.stop();
+              if (currentStream.removeTrack) {
+                currentStream.removeTrack(track);
+              }
+            });
+          } catch (err) {
+            console.error('[AUDIO] Error stopping tracks:', err);
+          }
+          currentStream = null;
+        }
+        
+        // Close audio context if it exists
+        if (audioContext) {
+          if (audioContext.state !== 'closed') {
+            audioContext.close().catch((err) => {
+              console.error('[AUDIO] Error closing audio context:', err);
+            });
+          }
+          audioContext = null;
+        }
+        
+        console.log('[AUDIO] Audio streaming stopped');
+      } catch (error) {
+        console.error('[AUDIO] Error stopping audio stream:', error);
+      } finally {
+        // 【关键】确保标志被重置，即使出错也要解锁
+        isAudioStreaming = false;
+      }
+    }
+    
+    // Play audio chunk from Realtime API (queued playback)
+    function playAudioChunk(base64Audio) {
+      try {
+        console.log(`[AUDIO] playAudioChunk called with ${base64Audio ? base64Audio.length : 0} bytes`);
+        
+        if (!base64Audio || typeof base64Audio !== 'string') {
+          console.warn('[WARN] Invalid audio data');
+          return;
+        }
+        
+        // Decode base64 to binary string
+        const binaryString = atob(base64Audio);
+        if (binaryString.length < 2) {
+          console.warn('[WARN] Audio data too short');
+          return;
+        }
+        
+        console.log(`[AUDIO] Decoded binary string length: ${binaryString.length}`);
+        
+        // Convert binary string to Int16Array (PCM16)
+        const audioArray = new Int16Array(binaryString.length / 2);
+        const view = new DataView(new ArrayBuffer(binaryString.length));
+        for (let i = 0; i < binaryString.length; i++) {
+          view.setUint8(i, binaryString.charCodeAt(i));
+        }
+        for (let i = 0; i < audioArray.length; i++) {
+          audioArray[i] = view.getInt16(i * 2, true); // little-endian
+        }
+        
+        console.log(`[AUDIO] Converted to Int16Array: ${audioArray.length} samples`);
+        
+        // Convert to Float32Array (normalized to -1.0 to 1.0)
+        const float32Array = new Float32Array(audioArray.length);
+        for (let i = 0; i < audioArray.length; i++) {
+          float32Array[i] = audioArray[i] / 32768.0;
+        }
+        
+        console.log(`[AUDIO] Converted to Float32Array: ${float32Array.length} samples`);
+        
+        // Add to queue
+        window.audioPlaybackQueue.push({
+          data: float32Array,
+          timestamp: Date.now()
+        });
+        
+        console.log(`[AUDIO] Queued audio chunk (${float32Array.length} samples), queue length: ${window.audioPlaybackQueue.length}, isPlaying: ${window.audioPlaybackIsPlaying}`);
+        
+        // Start playback if not already playing
+        if (!window.audioPlaybackIsPlaying) {
+          console.log('[AUDIO] Starting playback queue');
+          processAudioQueue();
+        } else {
+          console.log('[AUDIO] Playback already in progress, chunk will be played when queue processes it');
+        }
+      } catch (error) {
+        console.error('[ERROR] Error queuing audio:', error);
+        console.error('[ERROR] Error stack:', error.stack);
+      }
+    }
+    
+    // Process audio queue sequentially
+    async function processAudioQueue() {
+      if (window.audioPlaybackQueue.length === 0) {
+        window.audioPlaybackIsPlaying = false;
+        console.log('[AUDIO] Queue empty, stopping playback');
+        return;
+      }
+      
+      window.audioPlaybackIsPlaying = true;
+      console.log(`[AUDIO] Processing queue, ${window.audioPlaybackQueue.length} chunks remaining`);
+      
+      // Create or reuse AudioContext for playback (separate from input)
+      if (!window.playbackAudioContext) {
+        console.log('[AUDIO] Creating new playback AudioContext');
+        window.playbackAudioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
+      }
+      
+      const playbackCtx = window.playbackAudioContext;
+      console.log(`[AUDIO] Playback AudioContext state: ${playbackCtx.state}, sampleRate: ${playbackCtx.sampleRate}`);
+      
+      // Resume if suspended
+      if (playbackCtx.state === 'suspended') {
+        console.log('[AUDIO] Resuming suspended playback context...');
+        await playbackCtx.resume().catch(err => {
+          console.error('[ERROR] Failed to resume playback context:', err);
+        });
+        console.log(`[AUDIO] Playback AudioContext state after resume: ${playbackCtx.state}`);
+      }
+      
+      if (playbackCtx.state === 'closed') {
+        console.log('[AUDIO] Playback context was closed, creating new one');
+        window.playbackAudioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
+      }
+      
+      // Create or reuse GainNode to control volume (reduce echo)
+      if (!window.playbackGainNode) {
+        console.log('[AUDIO] Creating GainNode for playback');
+        window.playbackGainNode = playbackCtx.createGain();
+        window.playbackGainNode.gain.value = 0.7; // Reduce volume to 70% to minimize echo
+        window.playbackGainNode.connect(playbackCtx.destination);
+        console.log('[AUDIO] GainNode created and connected to destination');
+      }
+      
+      // Get next chunk from queue
+      const chunk = window.audioPlaybackQueue.shift();
+      if (!chunk) {
+        window.audioPlaybackIsPlaying = false;
+        console.log('[AUDIO] No chunk available, stopping');
+        return;
+      }
+      
+      // Calculate duration of this chunk
+      const sampleRate = 24000;
+      const duration = chunk.data.length / sampleRate;
+      
+      // Schedule playback
+      const currentTime = playbackCtx.currentTime;
+      const startTime = Math.max(currentTime, window.audioPlaybackScheduledTime);
+      
+      console.log(`[AUDIO] Preparing to play chunk: ${chunk.data.length} samples, duration: ${duration.toFixed(3)}s, startTime: ${startTime.toFixed(3)}`);
+      
+      // Create AudioBuffer and play
+      try {
+        const audioBuffer = playbackCtx.createBuffer(1, chunk.data.length, sampleRate);
+        audioBuffer.getChannelData(0).set(chunk.data);
+        
+        const source = playbackCtx.createBufferSource();
+        source.buffer = audioBuffer;
+        source.connect(window.playbackGainNode);
+        
+        // Add error handler
+        source.onended = () => {
+          console.log(`[AUDIO] Audio chunk finished playing`);
+        };
+        
+        source.onerror = (error) => {
+          console.error('[ERROR] Audio source error:', error);
+        };
+        
+        source.start(startTime);
+        console.log(`[AUDIO] Audio source started at ${startTime.toFixed(3)}`);
+        
+        // Update scheduled time for next chunk
+        window.audioPlaybackScheduledTime = startTime + duration;
+        
+        console.log(`[AUDIO] Playing audio chunk (${chunk.data.length} samples, ${duration.toFixed(3)}s) at time ${startTime.toFixed(3)}`);
+        
+        // Schedule next chunk
+        setTimeout(() => {
+          processAudioQueue();
+        }, duration * 1000 - 10); // Process next chunk slightly before current ends
+      } catch (error) {
+        console.error('[ERROR] Failed to create or play audio buffer:', error);
+        console.error('[ERROR] Error stack:', error.stack);
+        // Continue processing queue even if this chunk fails
+        setTimeout(() => {
+          processAudioQueue();
+        }, 100);
+      }
+    }
+    
+    // Clear audio queue (call when response starts/ends)
+    function clearAudioQueue() {
+      window.audioPlaybackQueue = [];
+      window.audioPlaybackScheduledTime = 0;
+      window.audioPlaybackIsPlaying = false;
+    }
+    
+    // ========== Helper Functions ==========
+    
+    function stopCurrentAudio() {
       // Use MediaRecorder to detect when user speaks during AI playback
       let recorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
       let chunks = [];
@@ -679,7 +1569,12 @@
       checkAudioLevel();
     }
 
-    function startMediaRecorderWithWhisper(stream) {
+    // ========== Old functions removed - now using Realtime API ==========
+    
+    // Removed: startMediaRecorderWithWhisper, processUserAudio, sendInterviewMessage, playTTS, etc.
+    // All functionality now handled by Realtime API
+    
+    function startMediaRecorderWithWhisper_OLD(stream) {
       let recordingStartTime = null;
       let lastSpeechTime = null;
       let isCurrentlyRecording = false;

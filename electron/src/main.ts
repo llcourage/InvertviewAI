@@ -1,5 +1,6 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
 import * as path from 'path';
+import * as fs from 'fs';
 import WebSocket from 'ws';
 
 let mainWindow: BrowserWindow | null = null;
@@ -143,13 +144,32 @@ ipcMain.handle('open-realtime-demo', () => {
 // Track response state to avoid duplicate response.create requests
 let hasActiveResponse = false;
 
+// Load API key from local config file
+function loadApiKey(): string | null {
+  try {
+    const configPath = path.join(__dirname, '../config.local.json');
+    if (fs.existsSync(configPath)) {
+      const configData = fs.readFileSync(configPath, 'utf-8');
+      const config = JSON.parse(configData);
+      if (config.openaiApiKey) {
+        return config.openaiApiKey;
+      }
+    }
+  } catch (error) {
+    console.error('[ERROR] Failed to load config.local.json:', error);
+  }
+  
+  // Fallback to environment variable
+  return process.env.OPENAI_API_KEY || null;
+}
+
 // Realtime API WebSocket connection
 ipcMain.handle('realtime-connect', async (_event, config) => {
-  // Get API key from environment variable
-  const apiKey = process.env.OPENAI_API_KEY;
+  // Load API key from local config file or environment variable
+  const apiKey = loadApiKey();
   
   if (!apiKey) {
-    throw new Error('OpenAI API key not configured. Please set OPENAI_API_KEY environment variable.');
+    throw new Error('OpenAI API key not configured. Please create electron/config.local.json with your API key or set OPENAI_API_KEY environment variable.');
   }
 
   return new Promise((resolve, reject) => {
@@ -198,7 +218,7 @@ ipcMain.handle('realtime-connect', async (_event, config) => {
             input_audio_format: 'pcm16',
             output_audio_format: 'pcm16',
             // Enable noise reduction to reduce echo
-            input_audio_noise_reduction: true,
+            // input_audio_noise_reduction: true, // Removed - API expects object, not boolean
             // Note: input_audio_transcription is optional. 
             // Realtime API can understand audio directly without transcription.
             // Only enable if you need text transcripts for display/history.
@@ -229,6 +249,10 @@ ipcMain.handle('realtime-connect', async (_event, config) => {
         try {
           const message = JSON.parse(data.toString());
           
+          // Send to all windows that might be listening
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('realtime-message', message);
+          }
           if (demoWindow && !demoWindow.isDestroyed()) {
             demoWindow.webContents.send('realtime-message', message);
           }
@@ -236,6 +260,19 @@ ipcMain.handle('realtime-connect', async (_event, config) => {
           // Log only important events to prevent console flood
           if (message.type !== 'response.audio.delta' && message.type !== 'response.audio_transcript.delta') {
              console.log('[MSG] Realtime message:', message.type);
+          } else {
+            // Log audio delta for debugging (sample every 10th message to avoid spam)
+            if (message.type === 'response.audio.delta') {
+              const deltaLength = message.delta ? message.delta.length : 0;
+              if (Math.random() < 0.1) { // Log 10% of audio deltas
+                console.log(`[MSG] Realtime message: response.audio.delta (${deltaLength} bytes)`);
+              }
+            }
+          }
+          
+          // Always log response.audio.done to confirm audio completion
+          if (message.type === 'response.audio.done') {
+            console.log('[MSG] Realtime message: response.audio.done - audio response completed');
           }
 
           // Log session.updated to check if input_audio_transcription was applied
@@ -275,6 +312,14 @@ ipcMain.handle('realtime-connect', async (_event, config) => {
         
         hasActiveResponse = false;
         
+        // Send to all windows
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('realtime-message', {
+            type: 'connection.closed',
+            code: code,
+            reason: reasonStr
+          });
+        }
         if (demoWindow && !demoWindow.isDestroyed()) {
           demoWindow.webContents.send('realtime-message', {
             type: 'connection.closed',
