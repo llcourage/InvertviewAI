@@ -399,6 +399,10 @@
     let trackProcessor = null;
     let audioStreamReader = null;
     let isAudioStreaming = false;
+    let connectionMusicContext = null; // Track connection music AudioContext
+    let connectionMusicSource = null; // Track connection music source
+    let isConnecting = false; // Prevent multiple simultaneous connections
+    let sessionReady = false; // Track if session is ready
     
     // Audio playback queue system
     if (!window.audioPlaybackQueue) {
@@ -570,23 +574,33 @@
     }
 
     async function startCall() {
+      // Prevent multiple simultaneous connections
+      if (isConnecting || isConnected) {
+        console.log('[WARN] Already connecting or connected');
+        return;
+      }
+      
+      isConnecting = true;
+      
       // Prevent immediate execution to avoid blocking
       setTimeout(async () => {
         try {
           console.log('[DEBUG] Start call button clicked');
           
-          // Prevent multiple clicks
+          // Double check connection state
           if (isConnected) {
             console.log('[WARN] Already connected');
+            isConnecting = false;
             return;
           }
           
-          // Disable button immediately to prevent double-click
-          callButton.disabled = true;
+          // Update button state (keep enabled so user can disconnect)
+          callButton.disabled = false;
           callButton.textContent = '📴';
           callButton.classList.remove('start');
           callButton.classList.add('end');
           muteBtn.style.display = 'block';
+          muteBtn.disabled = false; // Ensure mute button is enabled
           statusText.textContent = 'Connecting to Realtime API...';
           statusIndicator.classList.remove('disconnected');
           
@@ -674,21 +688,48 @@
           // Wait for music to finish (5 seconds) before showing connected
           await musicPromise;
           
+          // Check if still connecting (user might have disconnected during music)
+          if (!isConnecting) {
+            console.log('[WARN] Connection cancelled during music playback');
+            return;
+          }
+          
           // Mark as connected and show ready state
           isConnected = true;
+          isConnecting = false;
+          console.log(`[CONNECT] Setting connected state - isConnected: ${isConnected}, isConnecting: ${isConnecting}`);
           statusText.textContent = 'Connected - Listening...';
           statusIndicator.classList.remove('disconnected');
           avatarContainer.classList.add('listening');
-          callButton.disabled = true;
+          callButton.disabled = false; // Enable button so user can disconnect
+          console.log('[CONNECT] UI updated to connected state');
           
           console.log('[OK] Connected to Realtime API');
           console.log('[LISTEN] Listening for events...');
           console.log(`[DEBUG] Connection state set: isConnected=${isConnected}`);
           
           // Trigger AI to start speaking (introduction) after music finishes
-          // Send response.create to trigger AI's introduction automatically
-          setTimeout(async () => {
+          // Wait for session to be ready before triggering AI
+          const waitForSessionAndTrigger = async () => {
+            // Wait up to 3 seconds for session.updated event
+            const maxWait = 3000;
+            const startTime = Date.now();
+            
+            while (!sessionReady && (Date.now() - startTime) < maxWait) {
+              await new Promise(resolve => setTimeout(resolve, 100));
+            }
+            
+            if (!sessionReady) {
+              console.warn('[WARN] Session not ready after 3 seconds, proceeding anyway');
+            }
+            
             try {
+              // Check if still connected before triggering AI
+              if (!isConnected) {
+                console.log('[WARN] Not connected, skipping AI introduction');
+                return;
+              }
+              
               console.log('[INFO] Triggering AI introduction after connection...');
               // Use response.create to trigger AI to speak automatically
               // AI will introduce itself based on the instructions we sent
@@ -704,8 +745,23 @@
               }
             } catch (error) {
               console.error('[ERROR] Failed to trigger AI introduction:', error);
+              // If connection error, update UI state
+              if (error.message && error.message.includes('not connected')) {
+                isConnected = false;
+                isConnecting = false;
+                statusText.textContent = 'Connection Lost';
+                statusIndicator.classList.add('disconnected');
+                callButton.textContent = '📞';
+                callButton.classList.remove('end');
+                callButton.classList.add('start');
+                callButton.disabled = false;
+                muteBtn.style.display = 'none';
+              }
             }
-          }, 500); // Small delay after connection to ensure everything is ready
+          };
+          
+          // Start waiting for session and trigger AI after a short delay
+          setTimeout(waitForSessionAndTrigger, 500);
           
           // Enable audio streaming (now that text connection is stable)
           const ENABLE_AUDIO_STREAMING = true;
@@ -753,9 +809,15 @@
                 const stream = await navigator.mediaDevices.getUserMedia(constraints);
                 currentStream = stream;
                 
-                statusText.textContent = 'Connected - Listening...';
-                avatarContainer.classList.add('listening');
-                audioVisualizer.classList.add('active');
+                // Only update UI if still connected
+                if (isConnected) {
+                  statusText.textContent = 'Connected - Listening...';
+                  avatarContainer.classList.add('listening');
+                  audioVisualizer.classList.add('active');
+                  console.log(`[AUDIO] Audio stream started - statusText: "${statusText.textContent}", isConnected: ${isConnected}`);
+                } else {
+                  console.log(`[AUDIO] Audio stream started but not connected - isConnected: ${isConnected}, skipping UI update`);
+                }
                 
                 // Setup audio visualization after UI is updated
                 setTimeout(() => {
@@ -783,6 +845,7 @@
           
           // Reset connection state on error
           isConnected = false;
+          isConnecting = false;
           statusText.textContent = 'Connection Failed';
           statusIndicator.classList.add('disconnected');
           callButton.disabled = false;
@@ -791,21 +854,39 @@
           callButton.classList.add('start');
           muteBtn.style.display = 'none';
           
+          // Stop any playing music
+          stopConnectionMusic();
+          
           alert(`Failed to start call: ${error.message || 'Unknown error'}`);
         }
       }, 100); // Small delay to prevent blocking
     }
 
     async function endCall() {
+      console.log('[ENDCALL] endCall() called');
+      console.log(`[ENDCALL] Current state - isConnected: ${isConnected}, isConnecting: ${isConnecting}`);
+      
+      // Stop connection process if in progress
+      isConnecting = false;
       isConnected = false;
+      sessionReady = false; // Reset session ready state
+      console.log(`[ENDCALL] State reset - isConnected: ${isConnected}, isConnecting: ${isConnecting}`);
+      
+      // Stop any playing connection music
+      stopConnectionMusic();
+      console.log('[ENDCALL] Connection music stopped');
+      
       callButton.textContent = '📞';
       callButton.classList.remove('end');
       callButton.classList.add('start');
+      callButton.disabled = false; // Ensure button is enabled
       muteBtn.style.display = 'none';
+      muteBtn.disabled = false; // Ensure mute button is enabled
       statusText.textContent = 'Call ended';
       statusIndicator.classList.add('disconnected');
       avatarContainer.classList.remove('listening', 'speaking');
       audioVisualizer.classList.remove('active');
+      console.log('[ENDCALL] UI updated to disconnected state');
 
       // Re-enable device selector
       micSelect.disabled = false;
@@ -844,6 +925,8 @@
     
     // Handle Realtime API messages (real connection) - copied from realtime-demo.html
     function handleRealtimeMessage(message) {
+      console.log(`[REALTIME] handleRealtimeMessage called - type: ${message?.type}, isConnected: ${isConnected}, isConnecting: ${isConnecting}`);
+      
       try {
         // Validate message
         if (!message || typeof message !== 'object') {
@@ -852,6 +935,59 @@
         }
         
         console.log(`[EVENT] ${message.type || 'unknown'}`);
+        
+        // IMPORTANT: Handle connection.closed BEFORE checking isConnected
+        // This ensures we can update UI state even if connection was lost unexpectedly
+        if (message.type === 'connection.closed') {
+          console.log('[REALTIME] Detected connection.closed event, processing...');
+          try {
+            const closeCode = message.code || 'Unknown';
+            const closeReason = message.reason || 'Unknown';
+            console.log(`[DISCONNECT] Connection closed by server. Code: ${closeCode}`);
+            console.log(`[DISCONNECT] Reason: ${closeReason}`);
+            
+            // Reset connection state
+            console.log(`[DISCONNECT] Before state reset - isConnected: ${isConnected}, isConnecting: ${isConnecting}, statusText: "${statusText.textContent}"`);
+            isConnected = false;
+            isConnecting = false;
+            sessionReady = false;
+            console.log(`[DISCONNECT] After state reset - isConnected: ${isConnected}, isConnecting: ${isConnecting}`);
+            
+            statusText.textContent = 'Disconnected';
+            console.log(`[DISCONNECT] Status text updated to: "${statusText.textContent}"`);
+            statusIndicator.classList.add('disconnected');
+            callButton.textContent = '📞';
+            callButton.classList.remove('end');
+            callButton.classList.add('start');
+            callButton.disabled = false;
+            muteBtn.style.display = 'none';
+            console.log(`[DISCONNECT] UI elements updated - button text: "${callButton.textContent}", statusText: "${statusText.textContent}"`);
+            
+            // Stop audio streaming
+            stopAudioStreaming();
+            
+            // Stop connection music if still playing
+            stopConnectionMusic();
+            
+            // Clear audio queue
+            clearAudioQueue();
+            
+            if (closeCode === 1008) {
+              console.error('[ERROR] Policy Violation - likely invalid audio format!');
+            }
+          } catch (e) {
+            console.error('[ERROR] Error handling connection.closed:', e);
+          }
+          return; // Exit early after handling connection.closed
+        }
+        
+        // Ignore other messages if not connected (but connection.closed was already handled above)
+        if (!isConnected) {
+          console.log(`[REALTIME] Ignoring message (not connected): ${message.type}, isConnected=${isConnected}`);
+          return;
+        }
+        
+        console.log(`[REALTIME] Processing message (connected): ${message.type}`);
         
         switch (message.type) {
           // User message transcription completed
@@ -899,25 +1035,37 @@
           // Response created - AI started responding
           case 'response.created':
             console.log('[AI] Assistant started responding...');
-            // Clear any previous audio queue and reset
-            clearAudioQueue();
-            window.audioPlaybackScheduledTime = 0;
-            if (window.playbackAudioContext) {
-              window.audioPlaybackScheduledTime = window.playbackAudioContext.currentTime;
+            // Only update UI if still connected
+            if (isConnected) {
+              // Clear any previous audio queue and reset
+              clearAudioQueue();
+              window.audioPlaybackScheduledTime = 0;
+              if (window.playbackAudioContext) {
+                window.audioPlaybackScheduledTime = window.playbackAudioContext.currentTime;
+              }
+              avatarContainer.classList.remove('listening');
+              avatarContainer.classList.add('speaking');
+              statusText.textContent = 'Interviewer speaking...';
+              console.log(`[RESPONSE.CREATED] UI updated - statusText: "${statusText.textContent}", isConnected: ${isConnected}`);
+            } else {
+              console.log(`[RESPONSE.CREATED] Ignoring UI update - isConnected: ${isConnected}`);
             }
-            avatarContainer.classList.remove('listening');
-            avatarContainer.classList.add('speaking');
-            statusText.textContent = 'Interviewer speaking...';
             isSpeaking = true;
             break;
             
           // Response done - AI finished responding
           case 'response.done':
             console.log('[AI] Assistant finished responding');
-            // Queue will finish playing naturally, no need to clear
-            avatarContainer.classList.remove('speaking');
-            avatarContainer.classList.add('listening');
-            statusText.textContent = 'Connected - Listening...';
+            // Only update UI if still connected
+            if (isConnected) {
+              // Queue will finish playing naturally, no need to clear
+              avatarContainer.classList.remove('speaking');
+              avatarContainer.classList.add('listening');
+              statusText.textContent = 'Connected - Listening...';
+              console.log(`[RESPONSE.DONE] UI updated - statusText: "${statusText.textContent}", isConnected: ${isConnected}`);
+            } else {
+              console.log(`[RESPONSE.DONE] Ignoring UI update - isConnected: ${isConnected}, statusText: "${statusText.textContent}"`);
+            }
             isSpeaking = false;
             break;
             
@@ -972,29 +1120,6 @@
             statusText.textContent = 'AI is thinking...';
             break;
             
-          // Connection closed event
-          case 'connection.closed':
-            try {
-              const closeCode = message.code || 'Unknown';
-              const closeReason = message.reason || 'Unknown';
-              console.log(`[DISCONNECT] Connection closed by server. Code: ${closeCode}`);
-              console.log(`[DISCONNECT] Reason: ${closeReason}`);
-              
-              // Reset connection state
-              isConnected = false;
-              statusText.textContent = 'Disconnected';
-              statusIndicator.classList.add('disconnected');
-              
-              // Stop audio streaming
-              stopAudioStreaming();
-              
-              if (closeCode === 1008) {
-                console.error('[ERROR] Policy Violation - likely invalid audio format!');
-              }
-            } catch (e) {
-              console.error('[ERROR] Error handling connection.closed:', e);
-            }
-            break;
             
           // Response text delta (streaming text)
           case 'response.text.delta':
@@ -1006,7 +1131,8 @@
             
           // Session update confirmation
           case 'session.updated':
-            console.log(`[OK] Session configured successfully`);
+            console.log(`[OK] Session configured successfully - session is ready`);
+            sessionReady = true;
             break;
             
           // Error handling
@@ -1289,6 +1415,12 @@
           (async () => {
             try {
               while (true) {
+                // Check if still connected before reading
+                if (!isConnected && !isConnecting) {
+                  console.log('[AUDIO] Not connected, stopping stream reader');
+                  break;
+                }
+                
                 const { done, value } = await reader.read();
                 
                 if (done) {
@@ -1297,13 +1429,27 @@
                 }
                 
                 if (value) {
-                  // Process the audio frame
-                  await processAudioFrame(value);
+                  // Only process if still connected
+                  if (isConnected || isConnecting) {
+                    // Process the audio frame
+                    await processAudioFrame(value);
+                  } else {
+                    console.log('[AUDIO] Not connected, skipping audio frame processing');
+                    break;
+                  }
                 }
               }
             } catch (streamError) {
-              console.error('[AUDIO] Stream reader error:', streamError);
-              frontendErrorCount++;
+              // Ignore errors if reader was released/canceled
+              if (streamError.message && 
+                  (streamError.message.includes('released') || 
+                   streamError.message.includes('canceled') ||
+                   streamError.message.includes('AbortError'))) {
+                console.log('[AUDIO] Stream reader stopped (expected):', streamError.message);
+              } else {
+                console.error('[AUDIO] Stream reader error:', streamError);
+                frontendErrorCount++;
+              }
             }
           })();
           
@@ -1347,11 +1493,28 @@
         // Stop stream reader if it exists
         if (window._audioStreamReader) {
           try {
-            window._audioStreamReader.cancel();
-            window._audioStreamReader.releaseLock();
+            // Cancel the reader first
+            window._audioStreamReader.cancel().catch(err => {
+              // Ignore errors if reader is already closed
+              if (err.name !== 'AbortError') {
+                console.error('[AUDIO] Error canceling stream reader:', err);
+              }
+            });
+            // Release lock only if reader is still active
+            try {
+              window._audioStreamReader.releaseLock();
+            } catch (releaseErr) {
+              // Reader may already be released, ignore this error
+              if (releaseErr.message && !releaseErr.message.includes('released')) {
+                console.error('[AUDIO] Error releasing stream reader lock:', releaseErr);
+              }
+            }
             console.log('[AUDIO] Stream reader stopped');
           } catch (err) {
-            console.error('[AUDIO] Error stopping stream reader:', err);
+            // Ignore errors if reader is already closed/released
+            if (err.message && !err.message.includes('released') && !err.message.includes('closed')) {
+              console.error('[AUDIO] Error stopping stream reader:', err);
+            }
           }
           window._audioStreamReader = null;
         }
@@ -1470,6 +1633,7 @@
       if (window.audioPlaybackQueue.length === 0) {
         window.audioPlaybackIsPlaying = false;
         console.log('[AUDIO] Queue empty, stopping playback');
+        // Don't update status text here - let connection state handlers manage it
         return;
       }
       
@@ -1575,11 +1739,39 @@
     
     // ========== Helper Functions ==========
     
+    // Stop connection music
+    function stopConnectionMusic() {
+      try {
+        if (connectionMusicSource) {
+          try {
+            connectionMusicSource.stop();
+          } catch (e) {
+            // Source might already be stopped
+          }
+          connectionMusicSource = null;
+        }
+        if (connectionMusicContext) {
+          if (connectionMusicContext.state !== 'closed') {
+            connectionMusicContext.close().catch(err => {
+              console.error('[ERROR] Error closing connection music context:', err);
+            });
+          }
+          connectionMusicContext = null;
+        }
+      } catch (error) {
+        console.error('[ERROR] Error stopping connection music:', error);
+      }
+    }
+    
     // Play connection music (5 seconds)
     async function playConnectionMusic(durationMs) {
+      // Stop any existing music first
+      stopConnectionMusic();
+      
       try {
         // Create AudioContext for connection sound
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        connectionMusicContext = audioCtx; // Store for cleanup
         
         // Generate a pleasant connection tone (two-tone chime)
         const sampleRate = audioCtx.sampleRate;
@@ -1625,20 +1817,46 @@
         const source = audioCtx.createBufferSource();
         source.buffer = buffer;
         source.connect(audioCtx.destination);
+        connectionMusicSource = source; // Store for cleanup
         
         return new Promise((resolve) => {
+          // Check if music was stopped externally
+          let wasStopped = false;
+          
           source.onended = () => {
-            audioCtx.close();
-            resolve();
+            if (!wasStopped) {
+              wasStopped = true;
+              if (audioCtx.state !== 'closed') {
+                audioCtx.close();
+              }
+              connectionMusicContext = null;
+              connectionMusicSource = null;
+              resolve();
+            }
           };
+          
+          source.onerror = () => {
+            if (!wasStopped) {
+              wasStopped = true;
+              connectionMusicContext = null;
+              connectionMusicSource = null;
+              resolve();
+            }
+          };
+          
           source.start(0);
           
           // Ensure we resolve even if onended doesn't fire
           setTimeout(() => {
-            if (audioCtx.state !== 'closed') {
-              audioCtx.close();
+            if (!wasStopped) {
+              wasStopped = true;
+              if (audioCtx && audioCtx.state !== 'closed') {
+                audioCtx.close();
+              }
+              connectionMusicContext = null;
+              connectionMusicSource = null;
+              resolve();
             }
-            resolve();
           }, durationMs);
         });
       } catch (error) {
@@ -1665,9 +1883,15 @@
         currentAudio = null;
       }
       isSpeaking = false;
-      avatarContainer.classList.remove('speaking');
-      avatarContainer.classList.add('listening');
-      statusText.textContent = 'Connected - Listening...';
+      // Only update UI if still connected
+      if (isConnected) {
+        avatarContainer.classList.remove('speaking');
+        avatarContainer.classList.add('listening');
+        statusText.textContent = 'Connected - Listening...';
+        console.log(`[STOPCURRENTAUDIO_1] UI updated - statusText: "${statusText.textContent}", isConnected: ${isConnected}`);
+      } else {
+        console.log(`[STOPCURRENTAUDIO_1] Ignoring UI update - isConnected: ${isConnected}`);
+      }
     }
     
     // Old function - to be removed
@@ -1820,8 +2044,11 @@
                 reader.readAsDataURL(audioBlob);
               } else {
                 console.log('⚠️ No audio chunks recorded, resetting to listening state');
-                avatarContainer.classList.add('listening');
-                statusText.textContent = 'Connected - Listening...';
+                // Only update UI if still connected
+                if (isConnected) {
+                  avatarContainer.classList.add('listening');
+                  statusText.textContent = 'Connected - Listening...';
+                }
               }
             };
 
@@ -1953,13 +2180,19 @@
           console.log('✅ Interview message sent, waiting for response...');
         } else {
           console.log('⚠️ Empty transcription, returning to listening state');
-          avatarContainer.classList.add('listening');
-          statusText.textContent = 'Connected - Listening...';
+          // Only update UI if still connected
+          if (isConnected) {
+            avatarContainer.classList.add('listening');
+            statusText.textContent = 'Connected - Listening...';
+          }
         }
       } catch (error) {
         console.error('❌ Error processing audio:', error);
-        avatarContainer.classList.add('listening');
-        statusText.textContent = 'Connected - Listening...';
+        // Only update UI if still connected
+        if (isConnected) {
+          avatarContainer.classList.add('listening');
+          statusText.textContent = 'Connected - Listening...';
+        }
       } finally {
         isProcessing = false;
       }
@@ -2031,8 +2264,11 @@
           await playTTS(assistantText);
         }
 
-        avatarContainer.classList.add('listening');
-        statusText.textContent = 'Connected - Listening...';
+        // Only update UI if still connected
+        if (isConnected) {
+          avatarContainer.classList.add('listening');
+          statusText.textContent = 'Connected - Listening...';
+        }
       } catch (error) {
         console.error('Error sending initial message:', error);
         window.electronAPI.removeInterviewStreamListener(); // Clean up listener
@@ -2113,15 +2349,21 @@
           console.log('✅ TTS playback completed, isSpeaking should be false now');
         } else {
           console.warn('⚠️ No assistant response received');
-          avatarContainer.classList.add('listening');
-          statusText.textContent = 'Connected - Listening...';
+          // Only update UI if still connected
+          if (isConnected) {
+            avatarContainer.classList.add('listening');
+            statusText.textContent = 'Connected - Listening...';
+          }
         }
       } catch (error) {
         console.error('❌ Error sending message:', error);
         window.electronAPI.removeInterviewStreamListener(); // Clean up listener
         isSpeaking = false; // Ensure isSpeaking is reset on error
-        avatarContainer.classList.add('listening');
-        statusText.textContent = 'Connected - Listening...';
+        // Only update UI if still connected
+        if (isConnected) {
+          avatarContainer.classList.add('listening');
+          statusText.textContent = 'Connected - Listening...';
+        }
       } finally {
         isProcessing = false;
       }
@@ -2146,9 +2388,15 @@
         currentAudio = null;
       }
       isSpeaking = false;
-      avatarContainer.classList.remove('speaking');
-      avatarContainer.classList.add('listening');
-      statusText.textContent = 'Connected - Listening...';
+      // Only update UI if still connected
+      if (isConnected) {
+        avatarContainer.classList.remove('speaking');
+        avatarContainer.classList.add('listening');
+        statusText.textContent = 'Connected - Listening...';
+        console.log(`[STOPCURRENTAUDIO_2] UI updated - statusText: "${statusText.textContent}", isConnected: ${isConnected}`);
+      } else {
+        console.log(`[STOPCURRENTAUDIO_2] Ignoring UI update - isConnected: ${isConnected}`);
+      }
     }
 
     async function playTTS(text) {
@@ -2230,10 +2478,15 @@
             }
             currentAudio = null;
             isSpeaking = false;
-            avatarContainer.classList.remove('speaking');
-            avatarContainer.classList.add('listening');
-            statusText.textContent = 'Connected - Listening...';
-            console.log('Ready to listen for next user input. isSpeaking:', isSpeaking, 'isConnected:', isConnected);
+            // Only update UI if still connected
+            if (isConnected) {
+              avatarContainer.classList.remove('speaking');
+              avatarContainer.classList.add('listening');
+              statusText.textContent = 'Connected - Listening...';
+              console.log('Ready to listen for next user input. isSpeaking:', isSpeaking, 'isConnected:', isConnected);
+            } else {
+              console.log('Audio finished but not connected, skipping UI update. isSpeaking:', isSpeaking, 'isConnected:', isConnected);
+            }
             resolve();
           };
           currentAudio.onerror = (error) => {

@@ -551,8 +551,20 @@ ipcMain.handle('realtime-send-text', async (_event, text: string) => {
 
 // Create AI response (trigger AI to speak without user input)
 ipcMain.handle('realtime-create-response', async () => {
-  if (!realtimeWS || realtimeWS.readyState !== WebSocket.OPEN) {
-    throw new Error('WebSocket is not connected');
+  if (!realtimeWS) {
+    console.error('[ERROR] WebSocket is null for response.create');
+    throw new Error('WebSocket is not connected (null)');
+  }
+  
+  if (realtimeWS.readyState !== WebSocket.OPEN) {
+    const stateNames: { [key: number]: string } = {
+      [WebSocket.CONNECTING]: 'CONNECTING',
+      [WebSocket.OPEN]: 'OPEN',
+      [WebSocket.CLOSING]: 'CLOSING',
+      [WebSocket.CLOSED]: 'CLOSED'
+    };
+    console.error(`[ERROR] WebSocket not open for response.create. State: ${stateNames[realtimeWS.readyState] || realtimeWS.readyState}`);
+    throw new Error(`WebSocket is not connected (state: ${stateNames[realtimeWS.readyState] || realtimeWS.readyState})`);
   }
 
   if (hasActiveResponse) {
