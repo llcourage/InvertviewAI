@@ -15,20 +15,237 @@
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
       background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
       height: 100vh;
-      display: flex;
-      flex-direction: column;
+      margin: 0;
+      padding: 0;
       color: white;
       overflow: hidden;
     }
 
-    .call-container {
+    /* New App Layout */
+    .app-layout {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      width: 100vw;
+      overflow: hidden;
+    }
+
+    /* Scrollbar Styling */
+    .records-list::-webkit-scrollbar,
+    .transcript-container::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    .records-list::-webkit-scrollbar-track,
+    .transcript-container::-webkit-scrollbar-track {
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 4px;
+    }
+
+    .records-list::-webkit-scrollbar-thumb,
+    .transcript-container::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 4px;
+    }
+
+    .records-list::-webkit-scrollbar-thumb:hover,
+    .transcript-container::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.3);
+    }
+
+    .conversation-item {
+      padding: 1rem;
+      margin-bottom: 0.75rem;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.3s;
+      border: 1px solid transparent;
+    }
+
+    .conversation-item:hover {
+      background: rgba(255, 255, 255, 0.15);
+      transform: translateX(4px);
+    }
+
+    .conversation-item.active {
+      background: rgba(33, 150, 243, 0.3);
+      border-color: rgba(33, 150, 243, 0.5);
+      box-shadow: 0 0 10px rgba(33, 150, 243, 0.3);
+    }
+
+    .conversation-item-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.5rem;
+    }
+
+    .conversation-item-title {
+      font-weight: 600;
+      font-size: 0.95rem;
+    }
+
+    .conversation-item-time {
+      font-size: 0.75rem;
+      opacity: 0.7;
+    }
+
+    .conversation-item-preview {
+      font-size: 0.85rem;
+      opacity: 0.8;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      margin-bottom: 0.25rem;
+    }
+
+    .conversation-item-stats {
+      font-size: 0.75rem;
+      opacity: 0.6;
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    /* Top Bar */
+    .top-bar {
+      background: rgba(0, 0, 0, 0.3);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 1rem 2rem;
+      flex-shrink: 0;
+    }
+
+    .top-bar-content {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      max-width: 100%;
+    }
+
+    .app-title {
+      font-size: 1.5rem;
+      font-weight: 600;
+      margin: 0;
+    }
+
+    .new-interview-btn {
+      padding: 0.75rem 1.5rem;
+      background: #4caf50;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    }
+
+    .new-interview-btn:hover {
+      background: #45a049;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+
+    .new-interview-btn:active {
+      transform: translateY(0);
+    }
+
+    /* Main Split View */
+    .main-split-view {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* Left Panel: Interview Records */
+    .records-panel {
+      width: 350px;
+      background: rgba(0, 0, 0, 0.4);
+      border-right: 1px solid rgba(255, 255, 255, 0.1);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    .records-header {
+      padding: 1.5rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      background: rgba(0, 0, 0, 0.2);
+      flex-shrink: 0;
+    }
+
+    .records-header h2 {
+      font-size: 1.2rem;
+      margin-bottom: 0.5rem;
+      font-weight: 600;
+    }
+
+    .records-count {
+      font-size: 0.9rem;
+      opacity: 0.8;
+    }
+
+    .records-count span {
+      font-weight: 600;
+      color: #4caf50;
+    }
+
+    .records-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1rem;
+    }
+
+    /* Right Panel: Interview Detail */
+    .detail-panel {
       flex: 1;
       display: flex;
       flex-direction: column;
-      align-items: center;
-      justify-content: center;
+      overflow: hidden;
+      background: rgba(0, 0, 0, 0.2);
+    }
+
+    /* Active Interview View (when connected) */
+    .active-interview-view {
+      flex: 1;
+      display: none; /* Hidden by default */
+      flex-direction: column;
       padding: 2rem;
-      position: relative;
+      overflow: hidden;
+    }
+
+    .interview-controls-header {
+      margin-bottom: 1.5rem;
+    }
+
+    /* History Detail View (when viewing past interview) */
+    .history-detail-view {
+      flex: 1;
+      display: flex; /* Shown by default */
+      flex-direction: column;
+      padding: 2rem;
+      overflow: hidden;
+    }
+
+    .detail-header {
+      margin-bottom: 1.5rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .detail-header h3 {
+      font-size: 1.3rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+    }
+
+    .detail-meta {
+      display: flex;
+      gap: 1.5rem;
+      font-size: 0.9rem;
+      opacity: 0.8;
     }
 
     .call-status {
@@ -137,13 +354,13 @@
     }
 
     .controls {
-      position: absolute;
-      bottom: 3rem;
-      left: 50%;
-      transform: translateX(-50%);
       display: flex;
       gap: 1rem;
       align-items: center;
+      justify-content: center;
+      padding: 1.5rem 0;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      margin-top: 1rem;
     }
 
     .call-button {
@@ -216,6 +433,30 @@
     .transcript.active {
       display: block;
     }
+    
+    /* Override for history view transcript */
+    .history-detail-view .transcript-container {
+      flex: 1;
+      overflow-y: auto;
+      padding: 0;
+      margin: 0;
+      min-height: 0; /* Allow flex shrinking */
+    }
+    
+    .history-detail-view .transcript {
+      position: static !important;
+      transform: none !important;
+      width: 100% !important;
+      max-width: none !important;
+      max-height: none !important;
+      height: auto !important;
+      background: transparent !important;
+      backdrop-filter: none !important;
+      padding: 1rem;
+      display: block !important;
+      bottom: auto !important;
+      left: auto !important;
+    }
 
     .transcript-item {
       margin-bottom: 0.5rem;
@@ -226,10 +467,43 @@
     .transcript-item.user {
       background: rgba(76, 175, 80, 0.2);
       text-align: right;
+      display: block !important; /* Ensure user messages are visible */
+      padding: 0.75rem;
+      margin-bottom: 0.75rem;
+      border-radius: 8px;
     }
 
     .transcript-item.interviewer {
       background: rgba(33, 150, 243, 0.2);
+      display: block !important; /* Ensure interviewer messages are visible */
+      padding: 0.75rem;
+      margin-bottom: 0.75rem;
+      border-radius: 8px;
+    }
+    
+    /* Ensure transcript items are visible in history view */
+    .history-detail-view .transcript-item {
+      display: block !important;
+      visibility: visible !important;
+      opacity: 1 !important;
+    }
+    
+    /* Transcript content styling */
+    .transcript-content {
+      word-wrap: break-word;
+      word-break: break-word;
+      white-space: pre-wrap;
+      overflow-wrap: break-word;
+      line-height: 1.5;
+      font-size: 0.95rem;
+    }
+    
+    .transcript-item.user .transcript-content {
+      text-align: right;
+    }
+    
+    .transcript-item.interviewer .transcript-content {
+      text-align: left;
     }
 
     .transcript-label {
@@ -239,13 +513,30 @@
     }
 
     .header {
-      position: absolute;
-      top: 1rem;
-      right: 1rem;
-      display: flex;
-      gap: 0.5rem;
-      align-items: center;
-      z-index: 1000;
+      display: none; /* Hide old header - functionality moved to top bar */
+    }
+
+    /* Scrollbar Styling */
+    .conversation-list::-webkit-scrollbar,
+    .transcript-container::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    .conversation-list::-webkit-scrollbar-track,
+    .transcript-container::-webkit-scrollbar-track {
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 4px;
+    }
+
+    .conversation-list::-webkit-scrollbar-thumb,
+    .transcript-container::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 4px;
+    }
+
+    .conversation-list::-webkit-scrollbar-thumb:hover,
+    .transcript-container::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.3);
     }
 
     .header-button {
@@ -327,30 +618,82 @@
     <button class="header-button" id="demoBtn">Realtime Demo</button>
   </div>
 
-  <div class="call-container">
-    <div class="call-status">
-      <div class="status-text">
-        <span class="status-indicator" id="statusIndicator"></span>
-        <span id="statusText">Ready to start interview</span>
+  <div class="app-layout">
+    <!-- Top Bar: New Interview Button -->
+    <div class="top-bar">
+      <div class="top-bar-content">
+        <h1 class="app-title">Interview AI</h1>
+        <button class="new-interview-btn" id="newInterviewBtn">+ New Interview</button>
       </div>
     </div>
 
-    <div class="avatar-container" id="avatarContainer">
-      <div class="avatar">👤</div>
-    </div>
+    <!-- Main Content: Split View -->
+    <div class="main-split-view">
+      <!-- Left Panel: Interview Records List -->
+      <div class="records-panel">
+        <div class="records-header">
+          <h2>Interview Records</h2>
+          <div class="records-count">Total: <span id="conversationCount">0</span></div>
+        </div>
+        <div class="records-list" id="conversationList">
+          <!-- Interview records will be added here dynamically -->
+        </div>
+      </div>
 
-    <div class="audio-visualizer" id="audioVisualizer">
-      <canvas class="visualizer-canvas" id="visualizerCanvas"></canvas>
-    </div>
+      <!-- Right Panel: Interview Detail -->
+      <div class="detail-panel">
+        <!-- Active Interview View (when connected) -->
+        <div class="active-interview-view" id="activeInterviewView" style="display: none;">
+          <div class="interview-controls-header">
+            <div class="call-status">
+              <div class="status-text">
+                <span class="status-indicator" id="statusIndicator"></span>
+                <span id="statusText">Ready to start interview</span>
+              </div>
+            </div>
+            <div class="audio-visualizer" id="audioVisualizer">
+              <canvas class="visualizer-canvas" id="visualizerCanvas"></canvas>
+            </div>
+          </div>
 
-    <div class="interviewer-name">Interview AI</div>
-    <div class="interview-type">Behavioral Question Interview</div>
+          <div class="interview-detail-content">
+            <div class="conversation-header">
+              <h3 id="currentConversationTitle">Current Interview</h3>
+              <div class="conversation-meta">
+                <span>Started: <span id="conversationStartTime">-</span></span>
+                <span>Messages: <span id="messageCount">0</span></span>
+              </div>
+            </div>
 
-    <div class="transcript" id="transcript"></div>
+            <div class="transcript-container">
+              <div class="transcript" id="transcript">
+                <!-- Transcript items will be added here -->
+              </div>
+            </div>
+          </div>
 
-    <div class="controls">
-      <button class="call-button mute" id="muteBtn" title="Mute/Unmute" style="display: none;">🔇</button>
-      <button class="call-button start" id="callButton">📞</button>
+          <div class="controls">
+            <button class="call-button mute" id="muteBtn" title="Mute/Unmute" style="display: none;">🔇</button>
+            <button class="call-button start" id="callButton">📞</button>
+          </div>
+        </div>
+
+        <!-- History Detail View (when viewing past interview) -->
+        <div class="history-detail-view" id="historyDetailView">
+          <div class="detail-header">
+            <h3 id="historyConversationTitle">Select an interview to view details</h3>
+            <div class="detail-meta">
+              <span id="historyStartTime">-</span>
+              <span id="historyMessageCount">0 messages</span>
+            </div>
+          </div>
+          <div class="transcript-container">
+            <div class="transcript" id="historyTranscript">
+              <!-- History transcript will be shown here -->
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -359,7 +702,7 @@
     const muteBtn = document.getElementById('muteBtn');
     const statusText = document.getElementById('statusText');
     const statusIndicator = document.getElementById('statusIndicator');
-    const avatarContainer = document.getElementById('avatarContainer');
+    const avatarContainer = document.getElementById('avatarContainer'); // May be null in new layout
     const transcript = document.getElementById('transcript');
     const toggleTranscript = document.getElementById('toggleTranscript');
     const floatingBtn = document.getElementById('floatingBtn');
@@ -368,6 +711,35 @@
     const visualizerCanvas = document.getElementById('visualizerCanvas');
     const canvasCtx = visualizerCanvas.getContext('2d');
     const micSelect = document.getElementById('micSelect');
+    
+    // New Interview button
+    const newInterviewBtn = document.getElementById('newInterviewBtn');
+    
+    // Conversation management elements
+    const conversationList = document.getElementById('conversationList');
+    const conversationCount = document.getElementById('conversationCount');
+    const currentConversationTitle = document.getElementById('currentConversationTitle');
+    const conversationStartTimeEl = document.getElementById('conversationStartTime');
+    const messageCountEl = document.getElementById('messageCount');
+    
+    // View elements
+    const activeInterviewView = document.getElementById('activeInterviewView');
+    const historyDetailView = document.getElementById('historyDetailView');
+    const historyConversationTitle = document.getElementById('historyConversationTitle');
+    const historyStartTime = document.getElementById('historyStartTime');
+    const historyMessageCount = document.getElementById('historyMessageCount');
+    const historyTranscript = document.getElementById('historyTranscript');
+    
+    // Helper function to safely update avatarContainer
+    function updateAvatarClass(action, ...classes) {
+      if (avatarContainer) {
+        if (action === 'add') {
+          avatarContainer.classList.add(...classes);
+        } else if (action === 'remove') {
+          avatarContainer.classList.remove(...classes);
+        }
+      }
+    }
 
     // Set canvas size - will be updated when visualizer is activated
     function updateCanvasSize() {
@@ -404,6 +776,12 @@
     let isConnecting = false; // Prevent multiple simultaneous connections
     let sessionReady = false; // Track if session is ready
     
+    // Conversation management
+    let conversations = []; // Array to store all conversations
+    let currentConversationId = null; // ID of the current active conversation
+    let conversationStartTime = null; // Start time of current conversation
+    let messageCounter = 0; // Counter for messages in current conversation
+    
     // Audio playback queue system
     if (!window.audioPlaybackQueue) {
       window.audioPlaybackQueue = [];
@@ -413,12 +791,24 @@
     
     // Helper functions for audio processing
     function floatTo16BitPCM(input) {
-      const output = new Int16Array(input.length);
+      // Create buffer with explicit byte length for 16-bit samples
+      const buffer = new ArrayBuffer(input.length * 2);
+      const view = new DataView(buffer);
+      
       for (let i = 0; i < input.length; i++) {
+        // Clamp value to [-1, 1] range
         const s = Math.max(-1, Math.min(1, input[i]));
-        output[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+        
+        // Convert to 16-bit integer: -1.0 -> -32768, +1.0 -> +32767
+        // Use Math.round for proper quantization
+        const int16 = s < 0 ? Math.round(s * 0x8000) : Math.round(s * 0x7FFF);
+        
+        // Write as Little Endian (true parameter ensures correct byte order)
+        view.setInt16(i * 2, int16, true);
       }
-      return output;
+      
+      // Return as Int16Array for compatibility
+      return new Int16Array(buffer);
     }
     
     function arrayBufferToBase64(buffer) {
@@ -437,16 +827,24 @@
     }
     
     function resampleAudio(input, inputSampleRate, outputSampleRate) {
+      // If sample rates match, return input as-is
+      if (inputSampleRate === outputSampleRate) {
+        return input;
+      }
+      
       const ratio = inputSampleRate / outputSampleRate;
       const outputLength = Math.round(input.length / ratio);
       const output = new Float32Array(outputLength);
       
+      // Linear interpolation for downsampling/upsampling
+      // This prevents aliasing by averaging samples when downsampling
       for (let i = 0; i < outputLength; i++) {
         const index = i * ratio;
         const indexFloor = Math.floor(index);
         const indexCeil = Math.min(indexFloor + 1, input.length - 1);
         const fraction = index - indexFloor;
         
+        // Linear interpolation between adjacent samples
         output[i] = input[indexFloor] * (1 - fraction) + input[indexCeil] * fraction;
       }
       
@@ -454,6 +852,20 @@
     }
 
     // Call button handler
+    // New Interview button - starts a new interview
+    newInterviewBtn.addEventListener('click', async () => {
+      if (!isConnected) {
+        await startCall();
+      } else {
+        // If already connected, show warning or end current call
+        if (confirm('A call is already in progress. Do you want to end it and start a new interview?')) {
+          await endCall();
+          await startCall();
+        }
+      }
+    });
+
+    // Call button - connect/disconnect (for active interview controls)
     callButton.addEventListener('click', async () => {
       if (!isConnected) {
         await startCall();
@@ -461,6 +873,37 @@
         await endCall();
       }
     });
+
+    // Initialize: Show history view by default if no active conversation
+    console.log('[INIT] Initializing views...');
+    console.log('[INIT] isConnected:', isConnected, 'conversations.length:', conversations.length);
+    console.log('[INIT] activeInterviewView:', activeInterviewView);
+    console.log('[INIT] historyDetailView:', historyDetailView);
+    
+    if (!isConnected && conversations.length > 0) {
+      // Show the most recent conversation
+      const mostRecent = conversations[conversations.length - 1];
+      console.log('[INIT] Showing most recent conversation:', mostRecent.id);
+      switchToConversation(mostRecent.id);
+    } else if (!isConnected) {
+      // No conversations yet, show empty history view
+      console.log('[INIT] No conversations, showing empty history view');
+      if (activeInterviewView) {
+        activeInterviewView.style.display = 'none';
+      }
+      if (historyDetailView) {
+        historyDetailView.style.display = 'flex';
+      }
+    } else {
+      // Connected, show active view
+      console.log('[INIT] Connected, showing active interview view');
+      if (activeInterviewView) {
+        activeInterviewView.style.display = 'flex';
+      }
+      if (historyDetailView) {
+        historyDetailView.style.display = 'none';
+      }
+    }
 
     // Mute button handler
     muteBtn.addEventListener('click', () => {
@@ -698,9 +1141,18 @@
           isConnected = true;
           isConnecting = false;
           console.log(`[CONNECT] Setting connected state - isConnected: ${isConnected}, isConnecting: ${isConnecting}`);
+          
+          // Create new conversation when connecting
+          createNewConversation();
+          
+          // Show active interview view
+          showActiveInterviewView();
+          
           statusText.textContent = 'Connected - Listening...';
           statusIndicator.classList.remove('disconnected');
-          avatarContainer.classList.add('listening');
+          if (avatarContainer) {
+            updateAvatarClass('add', 'listening');
+          }
           callButton.disabled = false; // Enable button so user can disconnect
           console.log('[CONNECT] UI updated to connected state');
           
@@ -812,7 +1264,7 @@
                 // Only update UI if still connected
                 if (isConnected) {
                   statusText.textContent = 'Connected - Listening...';
-                  avatarContainer.classList.add('listening');
+          updateAvatarClass('add', 'listening');
                   audioVisualizer.classList.add('active');
                   console.log(`[AUDIO] Audio stream started - statusText: "${statusText.textContent}", isConnected: ${isConnected}`);
                 } else {
@@ -872,6 +1324,14 @@
       sessionReady = false; // Reset session ready state
       console.log(`[ENDCALL] State reset - isConnected: ${isConnected}, isConnecting: ${isConnecting}`);
       
+      // Show history view after ending call
+      if (currentConversationId) {
+        const conversation = conversations.find(c => c.id === currentConversationId);
+        if (conversation) {
+          showHistoryDetailView(conversation);
+        }
+      }
+      
       // Stop any playing connection music
       stopConnectionMusic();
       console.log('[ENDCALL] Connection music stopped');
@@ -884,7 +1344,9 @@
       muteBtn.disabled = false; // Ensure mute button is enabled
       statusText.textContent = 'Call ended';
       statusIndicator.classList.add('disconnected');
-      avatarContainer.classList.remove('listening', 'speaking');
+      if (avatarContainer) {
+        updateAvatarClass('remove', 'listening', 'speaking');
+      }
       audioVisualizer.classList.remove('active');
       console.log('[ENDCALL] UI updated to disconnected state');
 
@@ -994,15 +1456,70 @@
           case 'conversation.item.input_audio_transcription.completed':
             try {
               console.log('[EVENT] Received user transcription event');
-              const userText = message.transcript;
-              if (userText && typeof userText === 'string' && userText.trim()) {
-                console.log(`[USER] User said: "${userText}"`);
-                addTranscript('You', userText, 'user');
-              } else {
-                console.log(`[WARN] User transcription is empty or invalid. transcript:`, userText);
+              console.log('[EVENT] Full message:', JSON.stringify(message, null, 2));
+              
+              // Check audio usage information to diagnose transcription completeness
+              if (message.usage) {
+                const duration = message.usage.duration || message.usage.seconds || 'unknown';
+                console.log('[AUDIO] Transcription usage info:', {
+                  duration: duration,
+                  type: message.usage.type,
+                  fullUsage: message.usage
+                });
+                
+                // Warn if audio duration seems too short for the transcript
+                if (typeof duration === 'number' && duration < 1) {
+                  console.warn(`[WARN] Audio duration is very short (${duration}s) - may indicate incomplete capture`);
+                }
+                // Also warn if duration is short compared to transcript length
+                // Rough estimate: 1 second of speech ≈ 2-3 words
+                if (typeof duration === 'number' && message.transcript) {
+                  const wordCount = message.transcript.trim().split(/\s+/).length;
+                  const expectedDuration = wordCount / 2.5; // words per second
+                  if (duration < expectedDuration * 0.7) {
+                    console.warn(`[WARN] Audio duration (${duration}s) seems short for transcript length (${wordCount} words, expected ~${expectedDuration.toFixed(1)}s)`);
+                  }
+                  
+                  // Check for suspicious transcript patterns (Whisper hallucinations)
+                  const transcript = message.transcript.trim().toLowerCase();
+                  const suspiciousPatterns = [
+                    'thank you', 'bye', 'subtitle', 'amara', 'vapor', 'tonight', 
+                    'younger man', 'looks at him', 'coming out', 'do it cause'
+                  ];
+                  const hasSuspiciousPattern = suspiciousPatterns.some(pattern => transcript.includes(pattern));
+                  if (hasSuspiciousPattern && duration < 2) {
+                    console.error(`[ERROR] Suspicious transcript pattern detected with short duration - likely Whisper hallucination due to corrupted audio!`);
+                    console.error(`[ERROR] Transcript: "${message.transcript}"`);
+                    console.error(`[ERROR] Duration: ${duration}s`);
+                    console.error(`[ERROR] This usually means audio data was corrupted during transmission.`);
+                  }
+                }
               }
+              
+              // Note: This event has a flat structure with transcript at root level
+              // Format: { type: '...', item_id: '...', transcript: '...', ... }
+              // The event type itself indicates this is user input audio transcription
+              
+              const userText = message.transcript;
+              if (!userText || typeof userText !== 'string' || !userText.trim()) {
+                console.log(`[WARN] User transcription is empty or invalid. transcript:`, userText);
+                console.log(`[WARN] transcript type: ${typeof userText}, isString: ${typeof userText === 'string'}, isEmpty: ${!userText || !userText.trim()}`);
+                break;
+              }
+              
+              const trimmedText = userText.trim();
+              
+              // Basic validation: check text length
+              if (trimmedText.length < 1) {
+                console.warn(`[WARN] Ignoring transcription - text too short: "${trimmedText}"`);
+                break;
+              }
+              
+              console.log(`[USER] User said: "${trimmedText}" (length: ${trimmedText.length})`);
+              addTranscript('You', trimmedText, 'user');
             } catch (e) {
               console.error('[ERROR] Error processing user message:', e);
+              console.error('[ERROR] Error stack:', e.stack);
             }
             break;
             
@@ -1043,8 +1560,8 @@
               if (window.playbackAudioContext) {
                 window.audioPlaybackScheduledTime = window.playbackAudioContext.currentTime;
               }
-              avatarContainer.classList.remove('listening');
-              avatarContainer.classList.add('speaking');
+          updateAvatarClass('remove', 'listening');
+          updateAvatarClass('add', 'speaking');
               statusText.textContent = 'Interviewer speaking...';
               console.log(`[RESPONSE.CREATED] UI updated - statusText: "${statusText.textContent}", isConnected: ${isConnected}`);
             } else {
@@ -1059,8 +1576,8 @@
             // Only update UI if still connected
             if (isConnected) {
               // Queue will finish playing naturally, no need to clear
-              avatarContainer.classList.remove('speaking');
-              avatarContainer.classList.add('listening');
+          updateAvatarClass('remove', 'speaking');
+          updateAvatarClass('add', 'listening');
               statusText.textContent = 'Connected - Listening...';
               console.log(`[RESPONSE.DONE] UI updated - statusText: "${statusText.textContent}", isConnected: ${isConnected}`);
             } else {
@@ -1072,15 +1589,47 @@
           // Conversation item created (user message)
           case 'conversation.item.created':
             console.log('[INFO] Conversation item created');
+            console.log('[INFO] Full message:', JSON.stringify(message, null, 2));
+            
+            // Only process user items
+            if (!message.item) {
+              console.log('[INFO] Conversation item created but no item found');
+              break;
+            }
+            
+            // Strict verification: must be user role
+            if (message.item.role !== 'user') {
+              console.log(`[INFO] Ignoring item - role is "${message.item.role}", not "user"`);
+              break;
+            }
+            
+            // Verify item type
+            if (message.item.type && message.item.type !== 'message') {
+              console.log(`[INFO] Ignoring item - type is "${message.item.type}", not "message"`);
+              break;
+            }
+            
             // Check if there's already a transcript in the item
-            if (message.item && message.item.content) {
+            if (message.item.content && Array.isArray(message.item.content)) {
+              // Only look for input_audio, not output_audio
               const audioContent = message.item.content.find(c => c.type === 'input_audio');
               if (audioContent && audioContent.transcript) {
-                console.log(`[USER] User said (from item): "${audioContent.transcript}"`);
-                addTranscript('You', audioContent.transcript, 'user');
+                const transcript = audioContent.transcript.trim();
+                
+                // Additional validation
+                if (transcript.length < 1) {
+                  console.warn(`[WARN] Ignoring transcript - too short: "${transcript}"`);
+                  break;
+                }
+                
+                console.log(`[USER] User said (from item): "${transcript}" (length: ${transcript.length})`);
+                addTranscript('You', transcript, 'user');
               } else {
                 console.log('[INFO] Conversation item created, waiting for transcription...');
+                console.log('[INFO] Item content types:', message.item.content.map(c => c.type));
               }
+            } else {
+              console.log('[INFO] Conversation item created but no content found');
             }
             break;
             
@@ -1104,19 +1653,42 @@
           // Input audio buffer events (confirmation that audio was received)
           case 'input_audio_buffer.speech_started':
             console.log('[VAD] Speech started detected');
-            avatarContainer.classList.add('listening');
+            console.log('[VAD] Full message:', JSON.stringify(message, null, 2));
+            updateAvatarClass('add', 'listening');
             statusText.textContent = 'Speaking...';
             break;
             
           case 'input_audio_buffer.speech_stopped':
             console.log('[VAD] Speech stopped detected');
-            avatarContainer.classList.remove('listening');
+            console.log('[VAD] Full message:', JSON.stringify(message, null, 2));
+            updateAvatarClass('remove', 'listening');
             statusText.textContent = 'Processing...';
             break;
             
           case 'input_audio_buffer.committed':
             console.log('[VAD] Audio buffer committed (user finished speaking)');
-            avatarContainer.classList.remove('listening');
+            console.log('[VAD] Full message:', JSON.stringify(message, null, 2));
+            if (message.audio_buffer) {
+              const durationMs = message.audio_buffer.duration_ms;
+              const size = message.audio_buffer.size;
+              console.log('[VAD] Audio buffer info:', {
+                duration_ms: durationMs,
+                duration_seconds: durationMs ? (durationMs / 1000).toFixed(2) : 'unknown',
+                size: size,
+                size_kb: size ? (size / 1024).toFixed(2) : 'unknown'
+              });
+              
+              // Warn if audio duration is suspiciously short
+              if (durationMs && durationMs < 500) {
+                console.warn(`[WARN] Audio duration is very short (${durationMs}ms) - may indicate incomplete capture`);
+              }
+              
+              // Warn if audio size is suspiciously small
+              if (size && size < 1000) {
+                console.warn(`[WARN] Audio buffer size is very small (${size} bytes) - may indicate data loss`);
+              }
+            }
+            updateAvatarClass('remove', 'listening');
             statusText.textContent = 'AI is thinking...';
             break;
             
@@ -1277,29 +1849,72 @@
           throw err;
         }
         
-        // Critical fix: Send lock to prevent data backlog causing crash
-        let isSending = false;
-        let lastSendTime = 0;
-        const PROCESS_INTERVAL = 50; // Limit processing frequency: minimum 50ms interval
+        // Audio buffering: accumulate frames before sending to improve quality
+        let audioBuffer = new Float32Array(0); // Buffer for resampled audio (24kHz Float32)
+        const TARGET_SAMPLE_RATE = 24000;
+        const BUFFER_DURATION_MS = 100; // Accumulate 100ms of audio before sending
+        const MIN_SAMPLES_TO_SEND = Math.floor(TARGET_SAMPLE_RATE * BUFFER_DURATION_MS / 1000); // 2400 samples @ 24kHz
+        let isSending = false; // Lock to prevent concurrent sends
 
         // Diagnostic counters for frontend
         let frontendProcessCount = 0;
         let frontendSendCount = 0;
         let frontendErrorCount = 0;
+        let frontendDroppedFrames = 0;
+        
+        // Function to send buffered audio
+        async function sendBufferedAudio() {
+          if (audioBuffer.length === 0 || isSending || !isConnected || isMuted) {
+            return;
+          }
+          
+          isSending = true;
+          try {
+            // Convert buffered audio to PCM16
+            const pcm16 = floatTo16BitPCM(audioBuffer);
+            
+            if (frontendSendCount < 5) {
+              console.log(`[AUDIO] Sending buffered audio: ${audioBuffer.length} samples (${(audioBuffer.length / TARGET_SAMPLE_RATE * 1000).toFixed(1)}ms) -> ${pcm16.length} PCM16 samples`);
+            }
+            
+            // Convert to Base64
+            const base64Audio = arrayBufferToBase64(pcm16.buffer);
+            
+            // Send to main process
+            if (window.electronAPI && window.electronAPI.realtimeSendAudio) {
+              frontendSendCount++;
+              
+              if (frontendSendCount <= 5) {
+                console.log(`[AUDIO] Sending audio chunk #${frontendSendCount} to main process (${base64Audio.length} chars Base64)...`);
+              }
+              
+              await window.electronAPI.realtimeSendAudio(base64Audio);
+              
+              if (frontendSendCount <= 5) {
+                console.log(`[AUDIO] Audio chunk #${frontendSendCount} sent successfully`);
+              }
+            } else {
+              console.error('[AUDIO] realtimeSendAudio API not available!');
+            }
+            
+            // Clear buffer after successful send
+            audioBuffer = new Float32Array(0);
+          } catch (error) {
+            console.error('[AUDIO] Error sending buffered audio:', error);
+            // Don't clear buffer on error, will retry on next send
+          } finally {
+            isSending = false;
+          }
+        }
         
         // Function to process audio frame from MediaStreamTrackProcessor
         async function processAudioFrame(audioFrame) {
           try {
-            const now = Date.now();
-            
-            // Throttle processing
-            if (!isConnected || isSending || (now - lastSendTime < PROCESS_INTERVAL) || isMuted) {
-              audioFrame.close(); // Release the frame
+            // Only process if connected and not muted
+            if (!isConnected || isMuted) {
+              audioFrame.close();
               return;
             }
-            
-            isSending = true;
-            lastSendTime = now;
             
             frontendProcessCount++;
             
@@ -1337,53 +1952,50 @@
             } catch (copyError) {
               console.error('[AUDIO] Failed to copy audio data:', copyError);
               audioFrame.close();
-              isSending = false;
               return;
+            }
+            
+            // Check audio data quality (only for first few frames to avoid spam)
+            if (frontendProcessCount <= 5 && pcmData.length > 0) {
+              const min = Math.min(...pcmData);
+              const max = Math.max(...pcmData);
+              const avg = pcmData.reduce((a, b) => a + Math.abs(b), 0) / pcmData.length;
+              const rms = Math.sqrt(pcmData.reduce((a, b) => a + b * b, 0) / pcmData.length);
+              console.log(`[AUDIO] Audio levels - min: ${min.toFixed(4)}, max: ${max.toFixed(4)}, avg: ${avg.toFixed(4)}, RMS: ${rms.toFixed(4)}`);
+              
+              // Warn if audio seems too quiet (likely silence or noise)
+              if (rms < 0.01) {
+                console.warn(`[WARN] Audio RMS is very low (${rms.toFixed(4)}) - may be silence or noise`);
+              }
             }
             
             // Resample to 24kHz if needed
             let resampledData = pcmData;
-            if (sampleRate !== 24000) {
+            if (sampleRate !== TARGET_SAMPLE_RATE) {
               if (frontendProcessCount <= 5) {
-                console.log(`[AUDIO] Resampling from ${sampleRate}Hz to 24kHz`);
+                console.log(`[AUDIO] Resampling from ${sampleRate}Hz to ${TARGET_SAMPLE_RATE}Hz`);
               }
-              resampledData = resampleAudio(pcmData, sampleRate, 24000);
+              resampledData = resampleAudio(pcmData, sampleRate, TARGET_SAMPLE_RATE);
             }
             
-            // Convert to PCM16
-            const pcm16 = floatTo16BitPCM(resampledData);
+            // Accumulate into buffer
+            const newBuffer = new Float32Array(audioBuffer.length + resampledData.length);
+            newBuffer.set(audioBuffer);
+            newBuffer.set(resampledData, audioBuffer.length);
+            audioBuffer = newBuffer;
             
             if (frontendProcessCount <= 5) {
-              console.log(`[AUDIO] Converted to PCM16: ${pcm16.length} samples`);
+              const bufferDurationMs = (audioBuffer.length / TARGET_SAMPLE_RATE) * 1000;
+              console.log(`[AUDIO] Buffer accumulated: ${audioBuffer.length} samples (${bufferDurationMs.toFixed(1)}ms), target: ${MIN_SAMPLES_TO_SEND} samples (${BUFFER_DURATION_MS}ms)`);
             }
             
-            // Convert to Base64
-            const base64Audio = arrayBufferToBase64(pcm16.buffer);
-            
-            if (frontendProcessCount <= 5) {
-              console.log(`[AUDIO] Converted to Base64: ${base64Audio.length} chars`);
-            }
-            
-            // Send to main process
-            if (window.electronAPI && window.electronAPI.realtimeSendAudio) {
-              frontendSendCount++;
-              
-              if (frontendSendCount <= 5) {
-                console.log(`[AUDIO] Sending audio chunk #${frontendSendCount} to main process...`);
-              }
-              
-              await window.electronAPI.realtimeSendAudio(base64Audio);
-              
-              if (frontendSendCount <= 5) {
-                console.log(`[AUDIO] Audio chunk #${frontendSendCount} sent successfully`);
-              }
-            } else {
-              console.error('[AUDIO] realtimeSendAudio API not available!');
-            }
-            
-            // Release the frame
+            // Release the frame immediately (we've copied the data)
             audioFrame.close();
-            isSending = false;
+            
+            // Send if buffer is large enough
+            if (audioBuffer.length >= MIN_SAMPLES_TO_SEND) {
+              await sendBufferedAudio();
+            }
           } catch (error) {
             frontendErrorCount++;
             console.error(`[AUDIO] Error processing audio frame #${frontendErrorCount}:`, error);
@@ -1393,7 +2005,6 @@
             } catch (e) {
               // Ignore errors when closing
             }
-            isSending = false;
           }
         }
         
@@ -1455,6 +2066,26 @@
           
           console.log('[AUDIO] MediaStreamTrackProcessor reader started');
           
+          // Set up periodic buffer flush to ensure audio is sent even if buffer doesn't reach minimum size
+          // This prevents audio from being stuck in buffer for too long
+          const FLUSH_INTERVAL_MS = 200; // Flush buffer every 200ms if there's data
+          let bufferFlushInterval = setInterval(async () => {
+            if (audioBuffer && audioBuffer.length > 0 && isConnected && !isMuted && !isSending) {
+              // Send buffer if it has at least some data (even if less than minimum)
+              // This ensures real-time audio streaming
+              const minFlushSamples = Math.floor(TARGET_SAMPLE_RATE * 0.05); // At least 50ms
+              if (audioBuffer.length >= minFlushSamples) {
+                if (frontendSendCount < 10) {
+                  console.log(`[AUDIO] Periodic flush: sending ${audioBuffer.length} samples (${(audioBuffer.length / TARGET_SAMPLE_RATE * 1000).toFixed(1)}ms)`);
+                }
+                await sendBufferedAudio();
+              }
+            }
+          }, FLUSH_INTERVAL_MS);
+          
+          // Store interval ID for cleanup
+          window._audioBufferFlushInterval = bufferFlushInterval;
+          
         } catch (err) {
           console.error('[AUDIO] Failed to setup MediaStreamTrackProcessor:', err);
           throw err;
@@ -1490,6 +2121,24 @@
     // Stop audio streaming - copied from realtime-demo.html
     function stopAudioStreaming() {
       try {
+        // Send any remaining buffered audio before stopping
+        if (audioBuffer && audioBuffer.length > 0 && isConnected && !isMuted) {
+          console.log(`[AUDIO] Sending remaining buffered audio before stopping: ${audioBuffer.length} samples`);
+          sendBufferedAudio().catch(err => {
+            console.error('[AUDIO] Error sending remaining buffered audio:', err);
+          });
+        }
+        
+        // Clear audio buffer
+        audioBuffer = new Float32Array(0);
+        
+        // Clear buffer flush interval if it exists
+        if (window._audioBufferFlushInterval) {
+          clearInterval(window._audioBufferFlushInterval);
+          window._audioBufferFlushInterval = null;
+          console.log('[AUDIO] Buffer flush interval cleared');
+        }
+        
         // Stop stream reader if it exists
         if (window._audioStreamReader) {
           try {
@@ -1885,8 +2534,8 @@
       isSpeaking = false;
       // Only update UI if still connected
       if (isConnected) {
-        avatarContainer.classList.remove('speaking');
-        avatarContainer.classList.add('listening');
+          updateAvatarClass('remove', 'speaking');
+          updateAvatarClass('add', 'listening');
         statusText.textContent = 'Connected - Listening...';
         console.log(`[STOPCURRENTAUDIO_1] UI updated - statusText: "${statusText.textContent}", isConnected: ${isConnected}`);
       } else {
@@ -2046,7 +2695,7 @@
                 console.log('⚠️ No audio chunks recorded, resetting to listening state');
                 // Only update UI if still connected
                 if (isConnected) {
-                  avatarContainer.classList.add('listening');
+          updateAvatarClass('add', 'listening');
                   statusText.textContent = 'Connected - Listening...';
                 }
               }
@@ -2162,7 +2811,7 @@
       try {
         isProcessing = true;
         console.log('🔄 Processing user audio...');
-        avatarContainer.classList.remove('listening');
+          updateAvatarClass('remove', 'listening');
         statusText.textContent = 'Processing...';
 
         const sttResponse = await window.electronAPI.apiSpeech({
@@ -2182,7 +2831,7 @@
           console.log('⚠️ Empty transcription, returning to listening state');
           // Only update UI if still connected
           if (isConnected) {
-            avatarContainer.classList.add('listening');
+          updateAvatarClass('add', 'listening');
             statusText.textContent = 'Connected - Listening...';
           }
         }
@@ -2190,7 +2839,7 @@
         console.error('❌ Error processing audio:', error);
         // Only update UI if still connected
         if (isConnected) {
-          avatarContainer.classList.add('listening');
+          updateAvatarClass('add', 'listening');
           statusText.textContent = 'Connected - Listening...';
         }
       } finally {
@@ -2212,7 +2861,7 @@
         stopCurrentAudio();
       }
 
-      avatarContainer.classList.remove('listening');
+          updateAvatarClass('remove', 'listening');
       statusText.textContent = 'Processing...';
 
       addTranscript('You', text, 'user');
@@ -2266,7 +2915,7 @@
 
         // Only update UI if still connected
         if (isConnected) {
-          avatarContainer.classList.add('listening');
+          updateAvatarClass('add', 'listening');
           statusText.textContent = 'Connected - Listening...';
         }
       } catch (error) {
@@ -2351,7 +3000,7 @@
           console.warn('⚠️ No assistant response received');
           // Only update UI if still connected
           if (isConnected) {
-            avatarContainer.classList.add('listening');
+          updateAvatarClass('add', 'listening');
             statusText.textContent = 'Connected - Listening...';
           }
         }
@@ -2361,7 +3010,7 @@
         isSpeaking = false; // Ensure isSpeaking is reset on error
         // Only update UI if still connected
         if (isConnected) {
-          avatarContainer.classList.add('listening');
+          updateAvatarClass('add', 'listening');
           statusText.textContent = 'Connected - Listening...';
         }
       } finally {
@@ -2390,8 +3039,8 @@
       isSpeaking = false;
       // Only update UI if still connected
       if (isConnected) {
-        avatarContainer.classList.remove('speaking');
-        avatarContainer.classList.add('listening');
+          updateAvatarClass('remove', 'speaking');
+          updateAvatarClass('add', 'listening');
         statusText.textContent = 'Connected - Listening...';
         console.log(`[STOPCURRENTAUDIO_2] UI updated - statusText: "${statusText.textContent}", isConnected: ${isConnected}`);
       } else {
@@ -2421,8 +3070,8 @@
           stopCurrentAudio();
         }
 
-        avatarContainer.classList.remove('listening');
-        avatarContainer.classList.add('speaking');
+          updateAvatarClass('remove', 'listening');
+          updateAvatarClass('add', 'speaking');
         statusText.textContent = 'Interviewer speaking...';
         isSpeaking = true;
 
@@ -2480,8 +3129,8 @@
             isSpeaking = false;
             // Only update UI if still connected
             if (isConnected) {
-              avatarContainer.classList.remove('speaking');
-              avatarContainer.classList.add('listening');
+          updateAvatarClass('remove', 'speaking');
+          updateAvatarClass('add', 'listening');
               statusText.textContent = 'Connected - Listening...';
               console.log('Ready to listen for next user input. isSpeaking:', isSpeaking, 'isConnected:', isConnected);
             } else {
@@ -2492,8 +3141,8 @@
           currentAudio.onerror = (error) => {
             console.error('Audio playback error:', error);
             isSpeaking = false;
-            avatarContainer.classList.remove('speaking');
-            avatarContainer.classList.add('listening');
+          updateAvatarClass('remove', 'speaking');
+          updateAvatarClass('add', 'listening');
             reject(error);
           };
           currentAudio.onpause = () => {
@@ -2505,21 +3154,390 @@
       } catch (error) {
         console.error('TTS error:', error);
         isSpeaking = false;
-        avatarContainer.classList.remove('speaking');
-        avatarContainer.classList.add('listening');
+          updateAvatarClass('remove', 'speaking');
+          updateAvatarClass('add', 'listening');
       }
     }
 
+    // Conversation Management Functions
+    function createNewConversation() {
+      const conversationId = `conv_${Date.now()}`;
+      const conversation = {
+        id: conversationId,
+        startTime: new Date(),
+        messages: [],
+        title: `Interview ${conversations.length + 1}`
+      };
+      conversations.push(conversation);
+      currentConversationId = conversationId;
+      conversationStartTime = conversation.startTime;
+      messageCounter = 0;
+      
+      // Update UI
+      updateConversationList();
+      updateConversationHeader();
+      clearTranscript();
+      
+      console.log(`[CONV] Created new conversation: ${conversationId}`);
+      return conversation;
+    }
+    
+    function getCurrentConversation() {
+      if (!currentConversationId) {
+        return createNewConversation();
+      }
+      return conversations.find(c => c.id === currentConversationId);
+    }
+    
+    function updateConversationList() {
+      conversationCount.textContent = conversations.length;
+      
+      // Clear and rebuild list
+      conversationList.innerHTML = '';
+      
+      conversations.forEach((conv, index) => {
+        const item = document.createElement('div');
+        item.className = `conversation-item ${conv.id === currentConversationId ? 'active' : ''}`;
+        item.dataset.conversationId = conv.id;
+        
+        const lastMessage = conv.messages[conv.messages.length - 1];
+        const preview = lastMessage ? (lastMessage.text.substring(0, 50) + '...') : 'No messages yet';
+        const timeStr = formatTime(conv.startTime);
+        
+        item.innerHTML = `
+          <div class="conversation-item-header">
+            <div class="conversation-item-title">${conv.title}</div>
+            <div class="conversation-item-time">${timeStr}</div>
+          </div>
+          <div class="conversation-item-preview">${preview}</div>
+          <div class="conversation-item-stats">
+            <span>${conv.messages.length} messages</span>
+          </div>
+        `;
+        
+        item.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          console.log(`[CONV] Clicked on conversation item: ${conv.id}`);
+          switchToConversation(conv.id);
+        });
+        
+        conversationList.appendChild(item);
+      });
+    }
+    
+    function switchToConversation(conversationId) {
+      console.log(`[CONV] switchToConversation called with ID: ${conversationId}`);
+      const conversation = conversations.find(c => c.id === conversationId);
+      if (!conversation) {
+        console.error(`[CONV] Conversation not found: ${conversationId}`);
+        return;
+      }
+      
+      console.log(`[CONV] Found conversation: ${conversation.title}, messages: ${conversation.messages.length}`);
+      console.log(`[CONV] Current conversation ID: ${currentConversationId}, isConnected: ${isConnected}`);
+      
+      // If switching to current active conversation and connected, show active view
+      if (conversationId === currentConversationId && isConnected) {
+        console.log(`[CONV] Showing active interview view`);
+        showActiveInterviewView();
+        return;
+      }
+      
+      // Otherwise show history view
+      console.log(`[CONV] Showing history detail view`);
+      currentConversationId = conversationId;
+      conversationStartTime = conversation.startTime;
+      messageCounter = conversation.messages.length;
+      
+      // Update UI
+      updateConversationList();
+      showHistoryDetailView(conversation);
+    }
+    
+    function showActiveInterviewView() {
+      activeInterviewView.style.display = 'flex';
+      historyDetailView.style.display = 'none';
+      updateConversationHeader();
+    }
+    
+    function showHistoryDetailView(conversation) {
+      console.log(`[CONV] showHistoryDetailView called for: ${conversation.title}`);
+      console.log(`[CONV] activeInterviewView:`, activeInterviewView);
+      console.log(`[CONV] historyDetailView:`, historyDetailView);
+      
+      if (!activeInterviewView || !historyDetailView) {
+        console.error(`[CONV] View elements not found!`);
+        return;
+      }
+      
+      activeInterviewView.style.display = 'none';
+      historyDetailView.style.display = 'flex';
+      console.log(`[CONV] Views updated - activeInterviewView: ${activeInterviewView.style.display}, historyDetailView: ${historyDetailView.style.display}`);
+      
+      // Update history view header
+      if (historyConversationTitle) {
+        historyConversationTitle.textContent = conversation.title;
+      }
+      if (historyStartTime) {
+        historyStartTime.textContent = formatTime(conversation.startTime);
+      }
+      if (historyMessageCount) {
+        historyMessageCount.textContent = `${conversation.messages.length} messages`;
+      }
+      
+      console.log(`[CONV] Header updated - title: ${conversation.title}, messages: ${conversation.messages.length}`);
+      
+      // Render messages in history view
+      renderHistoryMessages(conversation);
+    }
+    
+    function renderHistoryMessages(conversation) {
+      console.log(`[CONV] renderHistoryMessages called, messages: ${conversation.messages.length}`);
+      if (!historyTranscript) {
+        console.error(`[CONV] historyTranscript element not found!`);
+        return;
+      }
+      
+      historyTranscript.innerHTML = '';
+      
+      if (conversation.messages.length === 0) {
+        console.log(`[CONV] No messages to render`);
+        return;
+      }
+      
+      // Log all messages for debugging
+      console.log(`[CONV] All messages in conversation:`, conversation.messages.map((msg, i) => ({
+        index: i + 1,
+        speaker: msg.speaker,
+        type: msg.type,
+        textLength: msg.text ? msg.text.length : 0,
+        textPreview: msg.text ? msg.text.substring(0, 50) : 'EMPTY'
+      })));
+      
+      let renderedCount = 0;
+      conversation.messages.forEach((msg, index) => {
+        console.log(`[CONV] Processing message ${index + 1}: speaker="${msg.speaker}", type="${msg.type}", text="${msg.text ? msg.text.substring(0, 50) : 'EMPTY'}..."`);
+        if (!msg.text || !msg.text.trim()) {
+          console.warn(`[CONV] Message ${index + 1} has empty text, skipping`);
+          return;
+        }
+        addTranscriptToHistoryUI(msg.speaker, msg.text, msg.type, msg.timestamp);
+        renderedCount++;
+      });
+      
+      console.log(`[CONV] Finished rendering ${renderedCount} of ${conversation.messages.length} messages`);
+    }
+    
+    function addTranscriptToHistoryUI(speaker, text, type, timestamp) {
+      if (!historyTranscript) {
+        console.error(`[CONV] historyTranscript is null in addTranscriptToHistoryUI`);
+        return;
+      }
+      
+      console.log(`[CONV] addTranscriptToHistoryUI called - speaker: "${speaker}", type: "${type}", text length: ${text ? text.length : 0}, full text: "${text || 'EMPTY'}"`);
+      
+      // Normalize speaker name and type - handle both 'You' and 'user' type
+      let speakerName = 'Interview AI';
+      let itemType = 'interviewer'; // Default to interviewer
+      
+      // Determine if this is a user message
+      if (speaker === 'You' || type === 'user' || (typeof type === 'string' && type.toLowerCase() === 'user')) {
+        speakerName = 'You';
+        itemType = 'user';
+      } else if (speaker === 'Interviewer' || type === 'interviewer' || (typeof type === 'string' && type.toLowerCase() === 'interviewer')) {
+        speakerName = 'Interview AI';
+        itemType = 'interviewer';
+      } else {
+        // Fallback: use speaker as-is or determine from type
+        if (speaker === 'You') {
+          speakerName = 'You';
+          itemType = 'user';
+        } else {
+          speakerName = speaker || 'Interview AI';
+          itemType = 'interviewer';
+        }
+      }
+      
+      console.log(`[CONV] Normalized - speakerName: "${speakerName}", itemType: "${itemType}"`);
+      
+      const item = document.createElement('div');
+      item.className = `transcript-item ${itemType}`;
+      
+      const timeStr = formatTimestamp(timestamp);
+      
+      // Escape HTML to prevent XSS and ensure text is displayed correctly
+      const escapedText = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+      
+      item.innerHTML = `
+        <div class="transcript-header">
+          <span class="speaker-name">${speakerName}</span>
+          <span class="timestamp">${timeStr}</span>
+        </div>
+        <div class="transcript-content">${escapedText}</div>
+      `;
+      
+      console.log(`[CONV] Created transcript item - escaped text length: ${escapedText.length}, original text length: ${text.length}`);
+      
+      historyTranscript.appendChild(item);
+      console.log(`[CONV] Added transcript item to DOM - speaker: "${speaker}" -> "${speakerName}", type: "${type}" -> "${itemType}", className: "${item.className}", text: "${text.substring(0, 50)}...", total children: ${historyTranscript.children.length}`);
+      
+      // Verify the item is actually in the DOM
+      const verifyItem = historyTranscript.querySelector(`.transcript-item.${itemType}:last-child`);
+      if (!verifyItem) {
+        console.error(`[CONV] WARNING: Item not found in DOM after append! Looking for: .transcript-item.${itemType}`);
+      } else {
+        console.log(`[CONV] Verified: Item is in DOM with class "${verifyItem.className}"`);
+        // Check computed styles
+        const computedStyle = window.getComputedStyle(verifyItem);
+        console.log(`[CONV] Computed styles - display: "${computedStyle.display}", visibility: "${computedStyle.visibility}", opacity: "${computedStyle.opacity}"`);
+      }
+    }
+    
+    function renderConversationMessages(conversation) {
+      clearTranscript();
+      
+      conversation.messages.forEach(msg => {
+        addTranscriptToUI(msg.speaker, msg.text, msg.type, msg.timestamp, false);
+      });
+    }
+    
+    function updateConversationHeader() {
+      const conversation = getCurrentConversation();
+      if (conversation) {
+        currentConversationTitle.textContent = conversation.title;
+        conversationStartTimeEl.textContent = formatTime(conversation.startTime);
+        messageCountEl.textContent = conversation.messages.length;
+      }
+    }
+    
+    function formatTime(date) {
+      if (!date) return '-';
+      const now = new Date();
+      const diff = now - date;
+      const minutes = Math.floor(diff / 60000);
+      const hours = Math.floor(minutes / 60);
+      const days = Math.floor(hours / 24);
+      
+      if (days > 0) return `${days}d ago`;
+      if (hours > 0) return `${hours}h ago`;
+      if (minutes > 0) return `${minutes}m ago`;
+      return 'Just now';
+    }
+    
+    function clearTranscript() {
+      transcript.innerHTML = '';
+    }
+    
     function addTranscript(speaker, text, type) {
+      // Add to current conversation
+      const conversation = getCurrentConversation();
+      if (!conversation) {
+        console.error('[CONV] No current conversation when adding transcript!');
+        return null;
+      }
+      
+      // Validation: ensure text is valid
+      if (!text || typeof text !== 'string' || !text.trim()) {
+        console.warn(`[CONV] Ignoring transcript - invalid text: "${text}"`);
+        return null;
+      }
+      
+      const trimmedText = text.trim();
+      
+      // Additional validation for user messages: check for suspicious patterns
+      if (type === 'user' || speaker === 'You') {
+        // Check if text seems reasonable (not too short, not suspicious)
+        if (trimmedText.length < 1) {
+          console.warn(`[CONV] Ignoring user transcript - text too short: "${trimmedText}"`);
+          return null;
+        }
+        
+        // Log user message addition for debugging
+        console.log(`[CONV] Adding user message - speaker: "${speaker}", type: "${type}", text: "${trimmedText.substring(0, 100)}..."`);
+      }
+      
+      const timestamp = new Date();
+      const message = {
+        speaker,
+        text: trimmedText,
+        type,
+        timestamp
+      };
+      conversation.messages.push(message);
+      messageCounter++;
+      
+      console.log(`[CONV] Added message to conversation - speaker: "${speaker}", type: "${type}", text: "${trimmedText.substring(0, 50)}...", total messages: ${conversation.messages.length}`);
+      
+      // Update UI
+      addTranscriptToUI(speaker, trimmedText, type, timestamp, true);
+      updateConversationHeader();
+      updateConversationList();
+      
+      return message;
+    }
+    
+    function addTranscriptToUI(speaker, text, type, timestamp, scroll = true) {
       const item = document.createElement('div');
       item.className = `transcript-item ${type}`;
+      
+      const timeStr = formatTimestamp(timestamp);
+      const speakerName = speaker === 'You' ? 'You' : 'Interview AI';
+      
       item.innerHTML = `
-        <div class="transcript-label">${speaker}</div>
+        <div class="transcript-header">
+          <span class="speaker-name">${speakerName}</span>
+          <span class="timestamp">${timeStr}</span>
+        </div>
         <div class="transcript-content">${text}</div>
+        <div class="audio-waveform" data-audio-id="${Date.now()}">
+          <canvas class="waveform-canvas"></canvas>
+        </div>
       `;
+      
       transcript.appendChild(item);
-      transcript.scrollTop = transcript.scrollHeight;
-      return item; // Return item so it can be updated
+      
+      // Render waveform
+      renderWaveform(item.querySelector('.waveform-canvas'));
+      
+      if (scroll) {
+        transcript.scrollTop = transcript.scrollHeight;
+      }
+      
+      return item;
+    }
+    
+    function formatTimestamp(date) {
+      if (!date) return '00:00';
+      const d = new Date(date);
+      const minutes = Math.floor((d - conversationStartTime) / 60000);
+      const seconds = Math.floor(((d - conversationStartTime) % 60000) / 1000);
+      return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    }
+    
+    function renderWaveform(canvas) {
+      if (!canvas) return;
+      
+      const ctx = canvas.getContext('2d');
+      const width = canvas.parentElement.offsetWidth;
+      const height = 40;
+      
+      canvas.width = width;
+      canvas.height = height;
+      
+      // Generate a simple waveform visualization
+      const bars = 50;
+      const barWidth = width / bars;
+      
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+      
+      for (let i = 0; i < bars; i++) {
+        const barHeight = Math.random() * height * 0.6 + height * 0.2;
+        const x = i * barWidth;
+        const y = (height - barHeight) / 2;
+        
+        ctx.fillRect(x, y, barWidth - 2, barHeight);
+      }
     }
 
     // Audio visualization functions
