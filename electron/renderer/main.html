@@ -106,6 +106,35 @@
       display: flex;
       gap: 0.5rem;
     }
+    
+    .conversation-item-actions {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: 0.5rem;
+      justify-content: flex-end;
+    }
+    
+    .delete-conversation-btn {
+      padding: 0.25rem 0.75rem;
+      background: rgba(244, 67, 54, 0.2);
+      color: #ff4444;
+      border: 1px solid rgba(244, 67, 54, 0.4);
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.8rem;
+      transition: all 0.2s;
+      opacity: 0.7;
+    }
+    
+    .delete-conversation-btn:hover {
+      background: rgba(244, 67, 54, 0.3);
+      opacity: 1;
+      transform: scale(1.05);
+    }
+    
+    .conversation-item:hover .delete-conversation-btn {
+      opacity: 1;
+    }
 
     /* Top Bar */
     .top-bar {
@@ -4478,14 +4507,32 @@
           <div class="conversation-item-stats">
             <span>${conv.messages.length} messages</span>
           </div>
+          <div class="conversation-item-actions">
+            <button class="delete-conversation-btn" data-conversation-id="${conv.id}" title="Delete conversation">🗑️ Delete</button>
+          </div>
         `;
         
+        // Click handler for conversation item (excluding delete button)
         item.addEventListener('click', (e) => {
+          // Don't trigger if clicking on delete button
+          if (e.target.classList.contains('delete-conversation-btn')) {
+            return;
+          }
           e.preventDefault();
           e.stopPropagation();
           console.log(`[CONV] Clicked on conversation item: ${conv.id}`);
           switchToConversation(conv.id);
         });
+        
+        // Delete button handler
+        const deleteBtn = item.querySelector('.delete-conversation-btn');
+        if (deleteBtn) {
+          deleteBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            deleteConversation(conv.id);
+          });
+        }
         
         conversationList.appendChild(item);
       });
@@ -4494,6 +4541,46 @@
     // ============================================
     // Conversation Management Functions
     // ============================================
+    function deleteConversation(conversationId) {
+      // Confirm deletion
+      if (!confirm('Are you sure you want to delete this conversation? This action cannot be undone.')) {
+        return;
+      }
+      
+      // Find conversation index
+      const index = conversations.findIndex(c => c.id === conversationId);
+      if (index === -1) {
+        console.error(`[CONV] Conversation not found for deletion: ${conversationId}`);
+        return;
+      }
+      
+      // Remove conversation from array
+      conversations.splice(index, 1);
+      
+      // If deleted conversation was current, clear current
+      if (currentConversationId === conversationId) {
+        currentConversationId = null;
+        conversationStartTime = null;
+        messageCounter = 0;
+        
+        // Show empty history view or most recent conversation
+        if (conversations.length > 0) {
+          const mostRecent = conversations[conversations.length - 1];
+          switchToConversation(mostRecent.id);
+        } else {
+          showHistoryDetailView(null);
+        }
+      }
+      
+      // Update UI
+      updateConversationList();
+      
+      // Save to disk
+      debouncedSaveConversations();
+      
+      console.log(`[CONV] Deleted conversation: ${conversationId}`);
+    }
+    
     function switchToConversation(conversationId) {
       console.log(`[CONV] switchToConversation called with ID: ${conversationId}`);
       const conversation = conversations.find(c => c.id === conversationId);
