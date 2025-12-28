@@ -241,16 +241,17 @@ Guidelines:
             voice: 'alloy',
             input_audio_format: 'pcm16',
             output_audio_format: 'pcm16',
+            // Enable transcription for user speech so we can display it in history
+            input_audio_transcription: {
+              model: 'whisper-1'
+            },
             // Enable noise reduction to reduce echo
             // input_audio_noise_reduction: true, // Removed - API expects object, not boolean
-            // Note: input_audio_transcription is optional. 
-            // Realtime API can understand audio directly without transcription.
-            // Only enable if you need text transcripts for display/history.
             turn_detection: {
               type: 'server_vad',
-              threshold: 0.3, // Lowered for better sensitivity
-              prefix_padding_ms: 300,
-              silence_duration_ms: 400 // Reduced for faster response
+              threshold: 0.25, // Further lowered for better sensitivity (was 0.3)
+              prefix_padding_ms: 800, // Increased to capture more prefix audio (was 500)
+              silence_duration_ms: 2000 // Increased to 2 seconds - gives user much more time for pauses/thinking (was 1000)
             }
           },
         };
