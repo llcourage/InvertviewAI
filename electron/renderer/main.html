@@ -853,13 +853,16 @@
         <!-- Dialer View (拨号界面) - shown when starting new conversation -->
         <div class="dialer-view" id="dialerView">
           <div class="dialer-container">
-            <!-- Status Display -->
-            <div class="call-status">
-              <div class="status-text">
-                <span class="status-indicator" id="dialerStatusIndicator"></span>
-                <span id="dialerStatusText">Ready to start interview</span>
-              </div>
+          <!-- Status Display -->
+          <div class="call-status">
+            <div class="status-text">
+              <span class="status-indicator" id="dialerStatusIndicator"></span>
+              <span id="dialerStatusText">Ready to start interview</span>
             </div>
+            <div class="call-duration" id="dialerCallDuration" style="display: none; margin-top: 0.5rem; font-size: 0.9rem; opacity: 0.8;">
+              <span>Duration: </span><span id="dialerDurationText">00:00</span> / 30:00
+            </div>
+          </div>
 
             <!-- Audio Visualizer -->
             <div class="audio-visualizer" id="dialerAudioVisualizer">
@@ -891,6 +894,9 @@
             <div class="status-text">
               <span class="status-indicator" id="activeStatusIndicator"></span>
               <span id="activeStatusText">Connected - Listening...</span>
+            </div>
+            <div class="call-duration" id="activeCallDuration" style="display: none; margin-top: 0.5rem; font-size: 0.9rem; opacity: 0.8;">
+              <span>Duration: </span><span id="activeDurationText">00:00</span> / 30:00
             </div>
           </div>
           
@@ -953,6 +959,10 @@
     const activeStatusIndicator = document.getElementById('activeStatusIndicator');
     const activeCallButton = document.getElementById('activeCallButton');
     const activeMuteBtn = document.getElementById('activeMuteBtn');
+    const dialerCallDuration = document.getElementById('dialerCallDuration');
+    const dialerDurationText = document.getElementById('dialerDurationText');
+    const activeCallDuration = document.getElementById('activeCallDuration');
+    const activeDurationText = document.getElementById('activeDurationText');
     
     // Use active view elements when connected, dialer elements when in dialer view
     let currentCallButton = dialerCallButton;
@@ -1119,6 +1129,110 @@
     let conversationStartTime = null; // Start time of current conversation
     let messageCounter = 0; // Counter for messages in current conversation
     let isSavingConversations = false; // Flag to prevent concurrent saves
+    
+    // Call duration timer (30 minutes max)
+    const MAX_CALL_DURATION_MS = 30 * 60 * 1000; // 30 minutes in milliseconds
+    let callStartTime = null; // Start time of the current call
+    let callTimerInterval = null; // Interval for updating call duration display
+    let callTimeoutId = null; // Timeout for auto-ending call after 30 minutes
+    
+    // Format duration as MM:SS
+    function formatDuration(ms) {
+      const totalSeconds = Math.floor(ms / 1000);
+      const minutes = Math.floor(totalSeconds / 60);
+      const seconds = totalSeconds % 60;
+      return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    }
+    
+    // Update call duration display
+    function updateCallDuration() {
+      if (!callStartTime) return;
+      
+      const elapsed = Date.now() - callStartTime;
+      const remaining = Math.max(0, MAX_CALL_DURATION_MS - elapsed);
+      const elapsedFormatted = formatDuration(elapsed);
+      const remainingFormatted = formatDuration(remaining);
+      
+      // Update both dialer and active view duration displays
+      if (dialerDurationText) {
+        dialerDurationText.textContent = elapsedFormatted;
+      }
+      if (activeDurationText) {
+        activeDurationText.textContent = elapsedFormatted;
+      }
+      
+      // Change color to red when less than 5 minutes remaining
+      if (remaining < 5 * 60 * 1000) {
+        if (dialerDurationText) {
+          dialerDurationText.style.color = '#ff4444';
+        }
+        if (activeDurationText) {
+          activeDurationText.style.color = '#ff4444';
+        }
+      } else {
+        if (dialerDurationText) {
+          dialerDurationText.style.color = '';
+        }
+        if (activeDurationText) {
+          activeDurationText.style.color = '';
+        }
+      }
+    }
+    
+    // Start call duration timer
+    function startCallTimer() {
+      // Clear any existing timers
+      stopCallTimer();
+      
+      callStartTime = Date.now();
+      
+      // Show duration displays
+      if (dialerCallDuration) {
+        dialerCallDuration.style.display = 'block';
+      }
+      if (activeCallDuration) {
+        activeCallDuration.style.display = 'block';
+      }
+      
+      // Update duration every second
+      callTimerInterval = setInterval(() => {
+        updateCallDuration();
+      }, 1000);
+      
+      // Auto-end call after 30 minutes
+      callTimeoutId = setTimeout(() => {
+        console.log('[TIMER] 30 minutes reached, auto-ending call');
+        if (isConnected || isConnecting) {
+          alert('Interview time limit reached (30 minutes). The call will be ended automatically.');
+          endCall();
+        }
+      }, MAX_CALL_DURATION_MS);
+      
+      // Initial update
+      updateCallDuration();
+    }
+    
+    // Stop call duration timer
+    function stopCallTimer() {
+      if (callTimerInterval) {
+        clearInterval(callTimerInterval);
+        callTimerInterval = null;
+      }
+      if (callTimeoutId) {
+        clearTimeout(callTimeoutId);
+        callTimeoutId = null;
+      }
+      
+      // Hide duration displays
+      if (dialerCallDuration) {
+        dialerCallDuration.style.display = 'none';
+      }
+      if (activeCallDuration) {
+        activeCallDuration.style.display = 'none';
+      }
+      
+      callStartTime = null;
+    }
     
     // Load conversations from disk on startup
     async function loadConversationsFromDisk() {
@@ -2014,6 +2128,7 @@
             if (dialerStatusText) {
               dialerStatusText.textContent = 'Connection Failed';
             }
+            stopCallTimer(); // Stop timer on error
             alert('Electron API not available');
             return;
           }
@@ -2027,6 +2142,7 @@
               dialerCallButton.classList.remove('end');
               dialerCallButton.classList.add('start');
             }
+            stopCallTimer(); // Stop timer on error
             alert('realtimeConnect method not available');
             return;
           }
@@ -2078,6 +2194,7 @@
             if (dialerStatusText) {
               dialerStatusText.textContent = 'Connection Failed';
             }
+            stopCallTimer(); // Stop timer on error
             throw wsError;
           }
         
@@ -2123,6 +2240,9 @@
           isConnected = true;
           isConnecting = false;
           console.log(`[CONNECT] Setting connected state - isConnected: ${isConnected}, isConnecting: ${isConnecting}`);
+          
+          // Start call duration timer
+          startCallTimer();
           
           // Create new conversation when connecting
           createNewConversation();
