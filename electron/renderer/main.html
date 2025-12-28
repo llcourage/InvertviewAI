@@ -4810,7 +4810,7 @@
       return conversations.find(c => c.id === currentConversationId);
     }
     
-    // Check if conversation duration is over 10 seconds (temporarily shortened for testing)
+    // Check if conversation duration is over 5 minutes
     function isConversationOver10Minutes(conversation) {
       if (!conversation.startTime || !conversation.messages || conversation.messages.length === 0) {
         return false;
@@ -4822,8 +4822,8 @@
       const durationMs = endTime - startTime;
       const durationSeconds = durationMs / 1000;
       
-      // Temporarily set to 10 seconds for testing (normally 10 minutes = 600 seconds)
-      return durationSeconds >= 10;
+      // 5 minutes = 300 seconds
+      return durationSeconds >= 300;
     }
     
     // Get rating badge class name
@@ -4924,9 +4924,9 @@
         return;
       }
       
-      // Check if conversation is over 10 seconds (temporarily shortened for testing)
+      // Check if conversation is over 5 minutes
       if (!isConversationOver10Minutes(conversation)) {
-        alert('Conversation must be at least 10 seconds long to generate a rating.');
+        alert('Conversation must be at least 5 minutes long to generate a rating.');
         return;
       }
       
