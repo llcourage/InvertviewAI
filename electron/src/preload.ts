@@ -22,6 +22,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getConversationsDir: () => ipcRenderer.invoke('get-conversations-dir'),
   selectConversationsDir: () => ipcRenderer.invoke('select-conversations-dir'),
   resetConversationsDir: () => ipcRenderer.invoke('reset-conversations-dir'),
+  // AI Rating API
+  generateAIRating: (conversation: any) => ipcRenderer.invoke('generate-ai-rating', conversation),
 });
 
 declare global {
@@ -44,6 +46,8 @@ declare global {
       getConversationsDir: () => Promise<string>;
       selectConversationsDir: () => Promise<{ success: boolean; path?: string; canceled?: boolean }>;
       resetConversationsDir: () => Promise<{ success: boolean; path: string }>;
+      // AI Rating API
+      generateAIRating: (conversation: any) => Promise<{ success: boolean; rating: any }>;
     };
   }
 }

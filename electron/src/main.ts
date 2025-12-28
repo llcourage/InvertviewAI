@@ -800,4 +800,155 @@ ipcMain.handle('reset-conversations-dir', async () => {
   }
 });
 
+// Generate AI rating for conversation
+ipcMain.handle('generate-ai-rating', async (_event, conversation: any) => {
+  try {
+    const apiKey = loadApiKey();
+    if (!apiKey) {
+      throw new Error('OpenAI API key not found');
+    }
+    
+    // Build conversation transcript
+    const transcript = conversation.messages.map((msg: any) => {
+      const speaker = msg.speaker === 'You' ? 'Candidate' : 'Interviewer';
+      return `${speaker}: ${msg.text}`;
+    }).join('\n\n');
+    
+    // Rating prompt template
+    const ratingPrompt = `You are an expert interviewer evaluating a candidate's performance. Based on the following interview transcript, provide a comprehensive evaluation.
+
+Interview Transcript:
+${transcript}
+
+Please evaluate the candidate across three key dimensions:
+1. Leadership - Ability to lead, influence, and take initiative
+2. Communication - Clarity, articulation, and effectiveness of communication
+3. Collaboration - Teamwork, cooperation, and ability to work with others
+
+For each dimension, provide:
+- A score from 1-5 (1 = Poor, 5 = Excellent)
+- Specific examples from the transcript
+- Strengths and areas for improvement
+
+Then provide an overall hiring recommendation from these options:
+- "No Hire" - Significant concerns that outweigh strengths
+- "Lean No Hire" - More concerns than strengths, but some positive aspects
+- "Lean Hire" - More strengths than concerns, but some areas need development
+- "Hire" - Strong candidate with clear strengths and manageable concerns
+- "Strong Hire" - Exceptional candidate with outstanding qualifications
+
+Format your response as JSON with the following structure:
+{
+  "leadership": {
+    "score": 1-5,
+    "examples": ["example 1", "example 2"],
+    "strengths": ["strength 1", "strength 2"],
+    "improvements": ["improvement 1", "improvement 2"]
+  },
+  "communication": {
+    "score": 1-5,
+    "examples": ["example 1", "example 2"],
+    "strengths": ["strength 1", "strength 2"],
+    "improvements": ["improvement 1", "improvement 2"]
+  },
+  "collaboration": {
+    "score": 1-5,
+    "examples": ["example 1", "example 2"],
+    "strengths": ["strength 1", "strength 2"],
+    "improvements": ["improvement 1", "improvement 2"]
+  },
+  "overallRecommendation": "No Hire" | "Lean No Hire" | "Lean Hire" | "Hire" | "Strong Hire",
+  "summary": "Overall summary of the candidate's performance",
+  "recommendations": ["recommendation 1", "recommendation 2"]
+}
+
+Respond ONLY with valid JSON, no additional text.`;
+
+    // Call OpenAI API using Node.js https module
+    const https = require('https');
+    const postData = JSON.stringify({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: 'You are an expert interviewer. Provide detailed, objective evaluations in JSON format.'
+        },
+        {
+          role: 'user',
+          content: ratingPrompt
+        }
+      ],
+      temperature: 0.7,
+      response_format: { type: 'json_object' }
+    });
+    
+    const response = await new Promise<any>((resolve, reject) => {
+      const options = {
+        hostname: 'api.openai.com',
+        port: 443,
+        path: '/v1/chat/completions',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Length': Buffer.byteLength(postData)
+        }
+      };
+      
+      const req = https.request(options, (res: any) => {
+        let data = '';
+        res.on('data', (chunk: any) => {
+          data += chunk;
+        });
+        res.on('end', () => {
+          resolve({
+            ok: res.statusCode >= 200 && res.statusCode < 300,
+            status: res.statusCode,
+            json: async () => JSON.parse(data),
+            text: async () => data
+          });
+        });
+      });
+      
+      req.on('error', (error: any) => {
+        reject(error);
+      });
+      
+      req.write(postData);
+      req.end();
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
+    }
+    
+    const data = await response.json();
+    const ratingContent = data.choices[0].message.content;
+    
+    // Parse JSON response
+    let rating;
+    try {
+      rating = JSON.parse(ratingContent);
+    } catch (parseError) {
+      // Try to extract JSON from markdown code blocks if present
+      const jsonMatch = ratingContent.match(/```json\s*([\s\S]*?)\s*```/) || ratingContent.match(/```\s*([\s\S]*?)\s*```/);
+      if (jsonMatch) {
+        rating = JSON.parse(jsonMatch[1]);
+      } else {
+        throw new Error('Failed to parse rating response as JSON');
+      }
+    }
+    
+    // Add timestamp
+    rating.timestamp = new Date().toISOString();
+    
+    console.log('[RATING] Generated AI rating:', rating);
+    return { success: true, rating };
+  } catch (error: any) {
+    console.error('[RATING] Failed to generate AI rating:', error);
+    throw new Error(`Failed to generate rating: ${error.message || String(error)}`);
+  }
+});
+
 
