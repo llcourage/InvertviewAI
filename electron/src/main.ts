@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
 import WebSocket from 'ws';
@@ -70,6 +70,12 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
   }
+});
+
+// Save conversations before app quits
+app.on('before-quit', () => {
+  console.log('[STORAGE] App is quitting, ensuring conversations are saved...');
+  // Note: Conversations are saved automatically via IPC, but we can add a final save here if needed
 });
 
 // IPC handlers
@@ -595,6 +601,202 @@ ipcMain.handle('realtime-disconnect', async () => {
     realtimeWS.close();
     realtimeWS = null;
     console.log('[OK] Realtime API disconnected');
+  }
+});
+
+// Conversation storage management
+// Store user-selected conversations directory path
+let customConversationsDir: string | null = null;
+const CONFIG_FILE = path.join(app.getPath('userData'), 'app-config.json');
+
+// Load custom conversations directory from config
+function loadCustomConversationsDir(): string | null {
+  try {
+    if (fs.existsSync(CONFIG_FILE)) {
+      const configData = fs.readFileSync(CONFIG_FILE, 'utf-8');
+      const config = JSON.parse(configData);
+      if (config.conversationsDir && typeof config.conversationsDir === 'string') {
+        // Validate that the directory exists or can be created
+        if (fs.existsSync(config.conversationsDir) || 
+            (fs.existsSync(path.dirname(config.conversationsDir)))) {
+          return config.conversationsDir;
+        } else {
+          console.warn('[STORAGE] Custom conversations directory does not exist:', config.conversationsDir);
+        }
+      }
+    }
+  } catch (error) {
+    console.error('[STORAGE] Failed to load custom conversations directory:', error);
+  }
+  return null;
+}
+
+// Save custom conversations directory to config
+function saveCustomConversationsDir(dirPath: string) {
+  try {
+    let config: any = {};
+    if (fs.existsSync(CONFIG_FILE)) {
+      const configData = fs.readFileSync(CONFIG_FILE, 'utf-8');
+      config = JSON.parse(configData);
+    }
+    config.conversationsDir = dirPath;
+    fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2), 'utf-8');
+    customConversationsDir = dirPath;
+    console.log('[STORAGE] Saved custom conversations directory:', dirPath);
+  } catch (error) {
+    console.error('[STORAGE] Failed to save custom conversations directory:', error);
+    throw error;
+  }
+}
+
+function getConversationsDir(): string {
+  // Use custom directory if set, otherwise use default
+  if (customConversationsDir) {
+    const dir = customConversationsDir;
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+      console.log('[STORAGE] Created custom conversations directory:', dir);
+    }
+    return dir;
+  }
+  
+  // Default: use userData/conversations
+  const userDataPath = app.getPath('userData');
+  const conversationsDir = path.join(userDataPath, 'conversations');
+  
+  // Ensure directory exists
+  if (!fs.existsSync(conversationsDir)) {
+    fs.mkdirSync(conversationsDir, { recursive: true });
+    console.log('[STORAGE] Created default conversations directory:', conversationsDir);
+  }
+  
+  return conversationsDir;
+}
+
+// Load custom directory on startup
+customConversationsDir = loadCustomConversationsDir();
+if (customConversationsDir) {
+  console.log('[STORAGE] Using custom conversations directory:', customConversationsDir);
+}
+
+function getConversationsFilePath(): string {
+  return path.join(getConversationsDir(), 'conversations.json');
+}
+
+// Save conversations to file
+ipcMain.handle('save-conversations', async (_event, conversations: any[]) => {
+  try {
+    const filePath = getConversationsFilePath();
+    const data = JSON.stringify(conversations, null, 2);
+    fs.writeFileSync(filePath, data, 'utf-8');
+    console.log(`[STORAGE] Saved ${conversations.length} conversations to ${filePath}`);
+    return { success: true, count: conversations.length };
+  } catch (error: any) {
+    console.error('[STORAGE] Failed to save conversations:', error);
+    throw new Error(`Failed to save conversations: ${error.message || String(error)}`);
+  }
+});
+
+// Load conversations from file
+ipcMain.handle('load-conversations', async () => {
+  try {
+    const filePath = getConversationsFilePath();
+    
+    if (!fs.existsSync(filePath)) {
+      console.log('[STORAGE] No conversations file found, returning empty array');
+      return { conversations: [], count: 0 };
+    }
+    
+    const data = fs.readFileSync(filePath, 'utf-8');
+    const conversations = JSON.parse(data);
+    
+    // Validate and convert date strings back to Date objects
+    if (Array.isArray(conversations)) {
+      conversations.forEach((conv: any) => {
+        if (conv.startTime && typeof conv.startTime === 'string') {
+          conv.startTime = new Date(conv.startTime);
+        }
+        // Ensure messages array exists
+        if (!Array.isArray(conv.messages)) {
+          conv.messages = [];
+        }
+      });
+      
+      console.log(`[STORAGE] Loaded ${conversations.length} conversations from ${filePath}`);
+      return { conversations, count: conversations.length };
+    } else {
+      console.warn('[STORAGE] Invalid conversations file format, returning empty array');
+      return { conversations: [], count: 0 };
+    }
+  } catch (error: any) {
+    console.error('[STORAGE] Failed to load conversations:', error);
+    // Return empty array on error instead of throwing
+    return { conversations: [], count: 0 };
+  }
+});
+
+// Get conversations directory path (for user reference)
+ipcMain.handle('get-conversations-dir', async () => {
+  return getConversationsDir();
+});
+
+// Let user select conversations directory
+ipcMain.handle('select-conversations-dir', async () => {
+  try {
+    if (!mainWindow) {
+      throw new Error('Main window not available');
+    }
+    
+    const result = await dialog.showOpenDialog(mainWindow, {
+      properties: ['openDirectory', 'createDirectory'],
+      title: 'Select Conversations Storage Folder',
+      buttonLabel: 'Select Folder'
+    });
+    
+    if (!result.canceled && result.filePaths.length > 0) {
+      const selectedDir = result.filePaths[0];
+      saveCustomConversationsDir(selectedDir);
+      
+      // Move existing conversations.json to new location if it exists in old location
+      const oldFilePath = path.join(app.getPath('userData'), 'conversations', 'conversations.json');
+      const newFilePath = path.join(selectedDir, 'conversations.json');
+      
+      if (fs.existsSync(oldFilePath) && !fs.existsSync(newFilePath)) {
+        try {
+          fs.copyFileSync(oldFilePath, newFilePath);
+          console.log('[STORAGE] Copied existing conversations to new location');
+        } catch (copyError) {
+          console.warn('[STORAGE] Failed to copy existing conversations:', copyError);
+        }
+      }
+      
+      return { success: true, path: selectedDir };
+    }
+    
+    return { success: false, canceled: true };
+  } catch (error: any) {
+    console.error('[STORAGE] Failed to select conversations directory:', error);
+    throw new Error(`Failed to select directory: ${error.message || String(error)}`);
+  }
+});
+
+// Reset to default conversations directory
+ipcMain.handle('reset-conversations-dir', async () => {
+  try {
+    customConversationsDir = null;
+    // Remove from config
+    if (fs.existsSync(CONFIG_FILE)) {
+      const configData = fs.readFileSync(CONFIG_FILE, 'utf-8');
+      const config = JSON.parse(configData);
+      delete config.conversationsDir;
+      fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2), 'utf-8');
+    }
+    const defaultDir = path.join(app.getPath('userData'), 'conversations');
+    console.log('[STORAGE] Reset to default conversations directory:', defaultDir);
+    return { success: true, path: defaultDir };
+  } catch (error: any) {
+    console.error('[STORAGE] Failed to reset conversations directory:', error);
+    throw new Error(`Failed to reset directory: ${error.message || String(error)}`);
   }
 });
 

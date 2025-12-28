@@ -744,6 +744,16 @@
       font-size: 0.9rem;
       z-index: 1000;
       position: relative;
+      white-space: nowrap;
+    }
+    
+    #storageSettingsBtn {
+      background: rgba(33, 150, 243, 0.2);
+      border-color: rgba(33, 150, 243, 0.4);
+    }
+    
+    #storageSettingsBtn:hover {
+      background: rgba(33, 150, 243, 0.3);
     }
 
     .header-button:hover {
@@ -818,7 +828,10 @@
     <div class="top-bar">
       <div class="top-bar-content">
         <h1 class="app-title">Interview AI</h1>
-        <button class="new-interview-btn" id="newInterviewBtn">+ New Interview</button>
+        <div style="display: flex; gap: 0.5rem; align-items: center;">
+          <button class="header-button" id="storageSettingsBtn" title="Conversations Storage Settings">📁 Storage</button>
+          <button class="new-interview-btn" id="newInterviewBtn">+ New Interview</button>
+        </div>
       </div>
     </div>
 
@@ -1105,6 +1118,64 @@
     let currentConversationId = null; // ID of the current active conversation
     let conversationStartTime = null; // Start time of current conversation
     let messageCounter = 0; // Counter for messages in current conversation
+    let isSavingConversations = false; // Flag to prevent concurrent saves
+    
+    // Load conversations from disk on startup
+    async function loadConversationsFromDisk() {
+      try {
+        if (window.electronAPI && window.electronAPI.loadConversations) {
+          console.log('[STORAGE] Loading conversations from disk...');
+          const result = await window.electronAPI.loadConversations();
+          if (result && result.conversations && Array.isArray(result.conversations)) {
+            conversations = result.conversations;
+            console.log(`[STORAGE] Loaded ${conversations.length} conversations from disk`);
+            
+            // Log storage location for user reference
+            if (window.electronAPI.getConversationsDir) {
+              const storageDir = await window.electronAPI.getConversationsDir();
+              console.log(`[STORAGE] Conversations stored in: ${storageDir}`);
+            }
+            
+            return true;
+          }
+        }
+      } catch (error) {
+        console.error('[STORAGE] Failed to load conversations:', error);
+      }
+      return false;
+    }
+    
+    // Save conversations to disk
+    async function saveConversationsToDisk() {
+      if (isSavingConversations) {
+        return; // Prevent concurrent saves
+      }
+      
+      try {
+        if (window.electronAPI && window.electronAPI.saveConversations) {
+          isSavingConversations = true;
+          const result = await window.electronAPI.saveConversations(conversations);
+          if (result && result.success) {
+            console.log(`[STORAGE] Saved ${result.count} conversations to disk`);
+          }
+        }
+      } catch (error) {
+        console.error('[STORAGE] Failed to save conversations:', error);
+      } finally {
+        isSavingConversations = false;
+      }
+    }
+    
+    // Debounced save function to avoid too frequent writes
+    let saveTimeout = null;
+    function debouncedSaveConversations() {
+      if (saveTimeout) {
+        clearTimeout(saveTimeout);
+      }
+      saveTimeout = setTimeout(() => {
+        saveConversationsToDisk();
+      }, 1000); // Save 1 second after last change
+    }
     
     // Audio playback queue system
     if (!window.audioPlaybackQueue) {
@@ -1642,24 +1713,43 @@
     ActiveInterviewView.init();
     HistoryDetailView.init();
     
-    // Initialize: Show history view by default if no active conversation
-    console.log('[INIT] Initializing views...');
-    console.log('[INIT] isConnected:', isConnected, 'conversations.length:', conversations.length);
+    // Load conversations from disk on startup, then initialize views
+    (async () => {
+      await loadConversationsFromDisk();
+      
+      // Initialize: Show history view by default if no active conversation
+      console.log('[INIT] Initializing views...');
+      console.log('[INIT] isConnected:', isConnected, 'conversations.length:', conversations.length);
+      
+      if (!isConnected && conversations.length > 0) {
+        // Show the most recent conversation
+        const mostRecent = conversations[conversations.length - 1];
+        console.log('[INIT] Showing most recent conversation:', mostRecent.id);
+        switchToConversation(mostRecent.id);
+      } else if (!isConnected) {
+        // No conversations yet, show empty history view
+        console.log('[INIT] No conversations, showing empty history view');
+        showHistoryDetailView(null);
+      } else {
+        // Connected, show active view
+        console.log('[INIT] Connected, showing active interview view');
+        showActiveInterviewView();
+      }
+    })();
     
-    if (!isConnected && conversations.length > 0) {
-      // Show the most recent conversation
-      const mostRecent = conversations[conversations.length - 1];
-      console.log('[INIT] Showing most recent conversation:', mostRecent.id);
-      switchToConversation(mostRecent.id);
-    } else if (!isConnected) {
-      // No conversations yet, show empty history view
-      console.log('[INIT] No conversations, showing empty history view');
-      showHistoryDetailView(null);
-    } else {
-      // Connected, show active view
-      console.log('[INIT] Connected, showing active interview view');
-      showActiveInterviewView();
-    }
+    // Save conversations before page unload
+    window.addEventListener('beforeunload', () => {
+      console.log('[STORAGE] Page unloading, saving conversations...');
+      // Clear debounce timeout and save immediately
+      if (saveTimeout) {
+        clearTimeout(saveTimeout);
+        saveTimeout = null;
+      }
+      // Note: Synchronous save might not work in beforeunload, but we try
+      saveConversationsToDisk().catch(err => {
+        console.error('[STORAGE] Failed to save on unload:', err);
+      });
+    });
 
     // Mute button handler
     if (dialerMuteBtn) {
@@ -1710,10 +1800,62 @@
         window.electronAPI.openRealtimeDemo();
         console.log('openRealtimeDemo called successfully');
       } catch (error) {
-        console.error('Error opening Realtime Demo:', error);
-        alert('Error opening Realtime Demo: ' + error.message);
+        console.error('Failed to open Realtime Demo:', error);
       }
     });
+    
+    // Storage settings button
+    const storageSettingsBtn = document.getElementById('storageSettingsBtn');
+    if (storageSettingsBtn) {
+      storageSettingsBtn.addEventListener('click', async () => {
+        try {
+          // Show dialog to select folder
+          const result = await window.electronAPI.selectConversationsDir();
+          if (result.success && result.path) {
+            alert(`Conversations storage location changed to:\n${result.path}\n\nExisting conversations will be moved to the new location.`);
+            // Reload conversations from new location
+            await loadConversationsFromDisk();
+            // Update UI
+            updateConversationList();
+            if (conversations.length > 0) {
+              const mostRecent = conversations[conversations.length - 1];
+              switchToConversation(mostRecent.id);
+            }
+          } else if (result.canceled) {
+            console.log('[STORAGE] User canceled folder selection');
+          }
+        } catch (error) {
+          console.error('[STORAGE] Failed to select conversations directory:', error);
+          alert(`Failed to change storage location: ${error.message || String(error)}`);
+        }
+      });
+    }
+    
+    // Add context menu for storage button to show current location and reset option
+    if (storageSettingsBtn) {
+      storageSettingsBtn.addEventListener('contextmenu', async (e) => {
+        e.preventDefault();
+        try {
+          const currentDir = await window.electronAPI.getConversationsDir();
+          const reset = confirm(`Current storage location:\n${currentDir}\n\nClick OK to reset to default location.`);
+          if (reset) {
+            const result = await window.electronAPI.resetConversationsDir();
+            if (result.success) {
+              alert(`Storage location reset to default:\n${result.path}\n\nReloading conversations...`);
+              await loadConversationsFromDisk();
+              updateConversationList();
+              if (conversations.length > 0) {
+                const mostRecent = conversations[conversations.length - 1];
+                switchToConversation(mostRecent.id);
+              }
+            }
+          }
+        } catch (error) {
+          console.error('[STORAGE] Failed to reset conversations directory:', error);
+          alert(`Failed to reset storage location: ${error.message || String(error)}`);
+        }
+      });
+    }
     
     // Check if button exists and API is available
     if (!demoBtn) {
@@ -4175,6 +4317,9 @@
       updateConversationHeader();
       clearTranscript();
       
+      // Save to disk
+      debouncedSaveConversations();
+      
       console.log(`[CONV] Created new conversation: ${conversationId}`);
       return conversation;
     }
@@ -4188,6 +4333,9 @@
     
     function updateConversationList() {
       conversationCount.textContent = conversations.length;
+      
+      // Save conversations to disk when list is updated (debounced)
+      debouncedSaveConversations();
       
       // Clear and rebuild list
       conversationList.innerHTML = '';
@@ -4341,6 +4489,9 @@
       ActiveInterviewView.addTranscript(speaker, trimmedText, type, timestamp);
       ActiveInterviewView.updateHeader();
       updateConversationList();
+      
+      // Save conversations to disk (debounced)
+      debouncedSaveConversations();
       
       return message;
     }
