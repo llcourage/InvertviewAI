@@ -5,7 +5,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openRealtimeDemo: () => ipcRenderer.invoke('open-realtime-demo'),
   // Realtime API
   realtimeConnect: (config?: any) => ipcRenderer.invoke('realtime-connect', config),
-  realtimeSendAudio: (audioData: ArrayBuffer) => ipcRenderer.invoke('realtime-send-audio', audioData),
+  realtimeSendAudio: (audioData: string | ArrayBuffer) => ipcRenderer.invoke('realtime-send-audio', audioData),
   realtimeSendText: (text: string) => ipcRenderer.invoke('realtime-send-text', text),
   realtimeUpdateSession: (instructions: string) => ipcRenderer.invoke('realtime-update-session', instructions),
   realtimeCreateResponse: () => ipcRenderer.invoke('realtime-create-response'),
@@ -25,7 +25,7 @@ declare global {
       openRealtimeDemo: () => Promise<void>;
       // Realtime API
       realtimeConnect: (config?: any) => Promise<any>;
-      realtimeSendAudio: (audioData: ArrayBuffer) => Promise<void>;
+      realtimeSendAudio: (audioData: string | ArrayBuffer) => Promise<void>;
       realtimeSendText: (text: string) => Promise<void>;
       realtimeUpdateSession: (instructions: string) => Promise<any>;
       realtimeCreateResponse: () => Promise<any>;

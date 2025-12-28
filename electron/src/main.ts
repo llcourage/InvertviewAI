@@ -249,9 +249,9 @@ Guidelines:
             // input_audio_noise_reduction: true, // Removed - API expects object, not boolean
             turn_detection: {
               type: 'server_vad',
-              threshold: 0.25, // Further lowered for better sensitivity (was 0.3)
+              threshold: 0.8, // Further increased to 0.8 to be even more strict (was 0.7)
               prefix_padding_ms: 800, // Increased to capture more prefix audio (was 500)
-              silence_duration_ms: 2000 // Increased to 2 seconds - gives user much more time for pauses/thinking (was 1000)
+              silence_duration_ms: 2500 // Increased to 2.5 seconds - gives user more time for pauses (was 2000)
             }
           },
         };
