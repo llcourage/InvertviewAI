@@ -21,6 +21,7 @@ function createMainWindow() {
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
+    autoHideMenuBar: true, // Hide menu bar
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -29,6 +30,9 @@ function createMainWindow() {
   });
 
   mainWindow.loadFile(path.join(__dirname, '../renderer/main.html'));
+  
+  // Ensure menu bar is hidden
+  mainWindow.setMenuBarVisibility(false);
 
   mainWindow.on('closed', () => {
     mainWindow = null;
