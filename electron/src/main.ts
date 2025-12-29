@@ -29,7 +29,7 @@ function createMainWindow() {
     },
   });
 
-  mainWindow.loadFile(path.join(__dirname, '../renderer/main.html'));
+  mainWindow.loadFile(path.join(__dirname, 'renderer/main.html'));
   
   // Ensure menu bar is hidden
   mainWindow.setMenuBarVisibility(false);
@@ -53,7 +53,7 @@ function createFloatingWindow() {
     },
   });
 
-  floatingWindow.loadFile(path.join(__dirname, '../renderer/floating.html'));
+  floatingWindow.loadFile(path.join(__dirname, 'renderer/floating.html'));
 
   floatingWindow.on('closed', () => {
     floatingWindow = null;
@@ -133,7 +133,7 @@ ipcMain.handle('open-realtime-demo', () => {
     console.log(`[Demo Window ${level}]:`, message);
   });
 
-  const demoPath = path.join(__dirname, '../renderer/realtime-demo.html');
+  const demoPath = path.join(__dirname, 'renderer/realtime-demo.html');
   console.log('Loading demo from:', demoPath);
   console.log('File exists:', require('fs').existsSync(demoPath));
   
@@ -155,6 +155,7 @@ ipcMain.handle('open-realtime-demo', () => {
 let hasActiveResponse = false;
 
 // Load API key from local config file
+// Note: This function will be replaced during build by inject-api-key.js script
 function loadApiKey(): string | null {
   try {
     const configPath = path.join(__dirname, '../config.local.json');

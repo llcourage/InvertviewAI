@@ -39,8 +39,23 @@ bazel-*
 # Electron
 electron/dist/
 electron/out/
+electron/release/
 electron/coverage/
 electron/config.local.json
+*.exe
+*.dmg
+*.AppImage
+*.deb
+*.rpm
+*.pkg
+*.blockmap
+builder-debug.yml
+builder-effective-config.yaml
+builder-effective-config.yml
+win-unpacked/
+mac/
+linux/
+*.asar
 
 # Vercel
 .vercel
